@@ -12,4 +12,4 @@
 1. 進入你的 ComfyUI 安裝目錄下的 `custom_nodes` 資料夾。
 2. 開啟終端機並執行：
    ```bash
-   git clone [https://github.com/yamasoo/comfyui-AI-Music-prompts.git](https://github.com/yamasoo/comfyui-AI-Music-prompts.git)
+   git clone https://github.com/yamasoo/comfyui-AI-Music-prompts.git
