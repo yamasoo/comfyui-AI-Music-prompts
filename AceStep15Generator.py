@@ -60,6 +60,7 @@ class AceStep15PromptGenerator:
         "Gamelan_加麥蘭音樂": {"bpm": (50, 80), "instruments": ["bronze gong ageng strikes", "metallic gangsa patterns", "kendang drum pulse", "suling flute tones", "resonant saron melody"], "vibes": ["meditative and hypnotic", "ceremonial and mystical", "ancient and ornate", "interlocking and cyclical"], "dynamics": ["layers interlocking metallic patterns into a shimmering whole", "pulses through long cyclic gong structures", "creates a trance-like ceremonial atmosphere"]},
         "Gospel_福音音樂": {"bpm": (70, 110), "instruments": ["powerful gospel choir", "Hammond B3 organ", "grand piano chords", "tambourine", "electric bass and live drums"], "vibes": ["uplifting and soulful", "spiritual and powerful", "joyful and communal", "deeply emotional and sincere"], "dynamics": ["rises to an ecstatic call-and-response climax", "builds from quiet devotion to full congregational glory", "fills the room with warmth and divine energy"]},
         "Greek_Folk_希臘民謠": {"bpm": (85, 130), "instruments": ["bouzouki melody", "baglamas strumming", "lyra fiddle", "daouli drum", "clarinet lines"], "vibes": ["spirited and communal", "nostalgic and Mediterranean", "festive and passionate", "earthy and traditional"], "dynamics": ["dances with zeimbekiko swagger and soulful melody", "builds into a lively circle dance celebration", "carries the warmth of a Greek taverna"]},
+        "Scottish_Folk_蘇格蘭風格": {"bpm": (80, 130), "instruments": ["Great Highland bagpipe", "snare drum march", "bass drum", "tenor drum swings", "massed pipe band drones"], "vibes": ["proud and martial", "windswept and majestic", "ceremonial and stirring", "ancient and clan-spirited"], "dynamics": ["marches with military precision and grandeur", "swells into a full pipe band wall of sound", "stirs deep ancestral pride with every drone"]},
         "Hawaiian_夏威夷音樂": {"bpm": (65, 95), "instruments": ["slack-key guitar picking", "steel guitar glides", "ukulele strums", "light percussion", "soft vocal harmonies"], "vibes": ["breezy and tropical", "gentle and serene", "warm and nostalgic", "island-spirited and joyful"], "dynamics": ["glides with the ease of ocean waves", "blooms with gentle melodic warmth", "captures the peaceful spirit of the islands"]},
         "JRPG_日式角色扮演遊戲": {"bpm": (75, 120), "instruments": ["emotive piano melody", "sweeping orchestral strings", "light chiptune accents", "harp arpeggios", "gentle choir"], "vibes": ["adventurous and heartfelt", "nostalgic and magical", "epic yet intimate", "fantasy-driven and emotional"], "dynamics": ["unfolds like a chapter from an epic quest", "balances quiet wonder with soaring melodic peaks", "captures the emotional journey of a heros story"]},
         "JRPG_Battle_日式角色扮演遊戲戰鬥音樂": {"bpm": (140, 175), "instruments": ["driving electric guitar riffs", "thundering orchestral percussion", "fast bass lines", "synth brass fanfares", "aggressive string ostinatos"], "vibes": ["intense and heroic", "fast-paced and adrenaline-fueled", "triumphant and fierce", "dramatic and urgent"], "dynamics": ["charges into battle with relentless tempo and force", "escalates tension through rapid rhythmic layering", "delivers non-stop energy and decisive power"]},
@@ -72,6 +73,8 @@ class AceStep15PromptGenerator:
         "Samba_森巴": {"bpm": (90, 110), "instruments": ["surdo bass drum", "tamborim high percussion", "cuica friction drum", "cavaquinho strumming", "ganza shaker"], "vibes": ["explosive and joyful", "carnival-ready and electric", "rhythmically complex and festive", "vibrant and passionate"], "dynamics": ["ignites with the unstoppable energy of Rio Carnival", "layers percussion into a thunderous polyrhythmic celebration", "drives forward with infectious samba swing"]},
         "Scandinavian_Folk_斯堪的納維亞民謠": {"bpm": (75, 115), "instruments": ["fiddle folk melody", "accordion drone", "cittern strumming", "wooden recorder", "jaw harp"], "vibes": ["rustic and pastoral", "cozy and introspective", "ancient yet familiar", "earthy and communal"], "dynamics": ["dances with simple, heartfelt folk charm", "rings with the clarity of Northern European tradition", "creates a warm fireside atmosphere through acoustic simplicity"]},
         "Tango_探戈": {"bpm": (60, 90), "instruments": ["bandoneon swells", "staccato violin stabs", "double bass walking line", "piano rhythmic comping", "dramatic pauses"], "vibes": ["passionate and sensual", "tense and dramatic", "elegant and dangerous", "melancholic and fiery"], "dynamics": ["surges with explosive passion followed by sudden silence", "entwines instruments in a dramatic musical dialogue", "commands the floor with pride, precision, and deep emotion"]},
+        "LOGH_EDStyle_銀英ED風格": {"bpm": (70, 85), "instruments": ["weathered yet warm narrative male vocals", "Opera bass old male vocals", "deep introspective orchestral strings", "restrained melancholic piano", "sparse classical guitar", "solemn brass ensemble"], "vibes": ["epic and introspective", "melancholic yet hopeful", "historically weighty", "nostalgic and reverent", "serene but powerful"], "dynamics": ["verses are intimate with sparse piano and soft strings supporting the vocal narrative", "chorus gradually swells with full strings and brass creating a vast tribute-like atmosphere", "overall progression feels like a slowly unfolding space elegy rather than explosive energy bursts"]},
+        "Enka_演歌": {"bpm": (50, 75), "instruments": ["tremolo electric guitar", "soaring strings", "shakuhachi flute", "taiko accents", "lush orchestral brass"], "vibes": ["melancholic and nostalgic", "stoic and soulful", "bittersweet and lonely", "dramatic and resilient"], "dynamics": ["slow-burning emotional build-ups", "expressive vocal-like vibrato on lead instruments", "cycles of heavy sorrow followed by dignified resolve"]},
         "Turkish_Folk_土耳其民謠": {"bpm": (80, 130), "instruments": ["saz baglama melody", "davul drum", "zurna shawm", "ney flute", "def frame drum"], "vibes": ["vibrant and regional", "passionate and folkloric", "ancient and soulful", "spirited and communal"], "dynamics": ["charges with Anatolian rhythmic fire and folk pride", "weaves ornamented melodic lines over driving percussion", "carries the cultural richness of Turkeys diverse heritage"]}    }
 
     MOOD_DATA = {
@@ -121,11 +124,44 @@ class AceStep15PromptGenerator:
         "Standard": "[Intro]\n(Instrumental)\n\n[Verse 1]\n{theme_line_1}\n{theme_line_2}\nWaiting for the moment to arise\n\n[Chorus]\n{power_phrase}!\nLet the rhythm take control\n\n[Outro]\nFading out..."
     }
 
-    PROMPT_TEMPLATE = (
-        "A {adj_1}, {adj_2} modern {genre} track with a {vibe} edge. "
-        "Driven by {inst_1}, {inst_2}, and {inst_3}. "
-        "The song {dynamic}, balancing {balance}."
-    )
+
+    # 擴展後的 Prompt 範本庫 (對應下拉選單)
+    PROMPT_TEMPLATES = {
+        "Standard_標準": (
+            "A {adj_1}, {adj_2} modern {genre} track with a {vibe} edge. "
+            "Driven by {inst_1}, {inst_2}, and {inst_3}. "
+            "The song {dynamic}, balancing {balance}."
+        ),
+        "Structured_結構化": (
+            "{genre}, {vibe}, {bpm} bpm, {inst_1}, {inst_2}, {inst_3}, "
+            "{adj_1}, {adj_2}, {mood} mood, high quality, clear production, masterpiece."
+        ),
+        "Groove_節奏律動": (
+            "Heavy groove {genre} track at {bpm} bpm. Focus on rhythmic {inst_1} and punchy {inst_2}, "
+            "layered with {inst_3}. The overall vibe is {vibe} and {adj_1}. {dynamic}."
+        ),
+        "Cinematic_電影敘事": (
+            "Cinematic and emotional {genre} soundtrack, {mood} atmosphere. The scene opens with {inst_1}, "
+            "gradually building up with {inst_2} and {inst_3}. "
+            "Features {adj_1} and {adj_2} textures. {dynamic}."
+        ),
+        "Vintage_復古類比": (
+            "Vintage {genre} style, {bpm} bpm. Analog warmth, {vibe} feel. "
+            "Instrumentation includes {inst_1}, {inst_2}, and {inst_3}. "
+            "Mood is {adj_1} and {adj_2}. {dynamic}."
+        )
+    }
+    # --- 新增：人聲特徵標籤對應庫 ---
+    VOCAL_TIMBRE_MAP = {
+        "Female (Clear/Pop)": "featuring clear and bright female vocals",
+        "Female (Husky/Soulful)": "featuring soulful, husky female vocals",
+        "Female (Ethereal)": "featuring ethereal and breathy female vocals",
+        "Male (Deep)": "featuring deep, resonant male vocals",
+        "Male (High/Tenor)": "featuring soaring, high-pitched male vocals",
+        "Male (Rough/Rock)": "featuring rough, gritty male vocals",
+        "Choir": "featuring a powerful background choir",
+        "Duet (Male & Female)": "featuring a male and female vocal duet"
+    }
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -135,12 +171,15 @@ class AceStep15PromptGenerator:
                 "genre": (["Random"] + list(cls.GENRE_DATA.keys()), {"default": "Random"}),
                 "mood": (["Random"] + list(cls.MOOD_DATA.keys()), {"default": "Random"}),
                 "vocal_mode": (["Full Lyrics", "Instrumental", "Choir/Humming"], {"default": "Full Lyrics"}),
-                "language": (["en", "zh", "jp"], {"default": "en", "tooltip": "選擇歌詞語言"}),  # 新增語言選單
+                "language": (["en", "zh", "jp"], {"default": "en", "tooltip": "選擇歌詞語言"}),
+                "prompt_style": (["Random", "Standard_標準", "Structured_結構化", "Groove_節奏律動", "Cinematic_電影敘事", "Vintage_復古類比"], {"default": "Random"}),
+                "vocal_timbre": (["Random", "None"] + list(cls.VOCAL_TIMBRE_MAP.keys()), {"default": "Random", "tooltip": "指定歌手聲線特徵"}),
             },
             "optional": {
                 "extra_prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "手動補充的 Prompt"}),
             }
         }
+
 
     # 修改 RETURN_TYPES 和 RETURN_NAMES，增加 language 輸出
     RETURN_TYPES = ("STRING", "STRING", "INT", AnyType("*"), AnyType("*"), "STRING", "STRING" )
@@ -148,7 +187,9 @@ class AceStep15PromptGenerator:
     FUNCTION = "generate_ace_params"
     CATEGORY = "AI Music/ACE-Step"
 
-    def generate_ace_params(self, seed, genre, mood, vocal_mode, language, extra_prompt=""):
+    
+    # 👇 1. 這裡補上了 vocal_timbre 參數
+    def generate_ace_params(self, seed, genre, mood, vocal_mode, language, prompt_style, vocal_timbre, extra_prompt=""):
         rng = random.Random(seed) if seed > 0 else random.Random()
             
         selected_genre = genre if genre != "Random" else rng.choice(list(self.GENRE_DATA.keys()))
@@ -160,35 +201,106 @@ class AceStep15PromptGenerator:
         root = rng.choice(self.ROOT_NOTES)
         keyscale = f"{root} {mood_info['scale']}"
 
-        # --- 1. 生成自然語言 Prompt ---
+        # 👇 2. 新增：處理人聲特徵 (防呆邏輯)
+        actual_vocal_string = ""
+        if vocal_mode == "Instrumental":
+            actual_vocal_string = "pure instrumental, no vocals"
+        else:
+            # 如果是 Random 就從字典裡抽一個，如果是 None 就不加標籤
+            chosen_timbre = vocal_timbre
+            if chosen_timbre == "Random":
+                chosen_timbre = rng.choice(list(self.VOCAL_TIMBRE_MAP.keys()))
+            
+            if chosen_timbre != "None" and chosen_timbre in self.VOCAL_TIMBRE_MAP:
+                actual_vocal_string = self.VOCAL_TIMBRE_MAP[chosen_timbre]
+
+        # --- 1. 生成多樣化 Prompt ---
         adjs = rng.sample(mood_info["adjs"], 2)
         insts = rng.sample(genre_info["instruments"], min(3, len(genre_info["instruments"])))
         vibe = rng.choice(genre_info["vibes"])
         dynamic = rng.choice(genre_info["dynamics"])
         balance = rng.choice(mood_info["balances"])
 
-        final_prompt = self.PROMPT_TEMPLATE.format(
-            adj_1=adjs[0], adj_2=adjs[1], genre=selected_genre.lower(), vibe=vibe,
-            inst_1=insts[0], inst_2=insts[1], inst_3=insts[2], dynamic=dynamic, balance=balance
+        # 根據選擇決定風格 (如果是 Random 就隨機抽一個)
+        selected_style_key = prompt_style if prompt_style != "Random" else rng.choice(list(self.PROMPT_TEMPLATES.keys()))
+        selected_template = self.PROMPT_TEMPLATES[selected_style_key]
+
+        # 填入變數組成最終字串
+        final_prompt = selected_template.format(
+            adj_1=adjs[0], adj_2=adjs[1], 
+            genre=selected_genre.split('_')[0].lower(), 
+            vibe=vibe, bpm=bpm, mood=selected_mood.split('_')[0].lower(),
+            inst_1=insts[0], inst_2=insts[1], inst_3=insts[2], 
+            dynamic=dynamic, balance=balance
         )
         
-        if extra_prompt and extra_prompt.strip():
-            final_prompt = f"{final_prompt} {extra_prompt.strip()}"
+        # 👇 3. 新增：將人聲特徵融合進 Prompt 中
+        if actual_vocal_string:
+            final_prompt = f"{final_prompt}, {actual_vocal_string}"
 
-        # --- 2. 生成歌詞 (根據 Vocal Mode 和語言) ---
+        # 如果有手寫的 extra_prompt 才加上去
+        if extra_prompt and extra_prompt.strip():
+            final_prompt = f"{final_prompt}, {extra_prompt.strip()}"
+        
+        
+        # --- 2. 生成歌詞 (支援長時長生成的擴展結構版) ---
         final_lyrics = ""
 
         if vocal_mode == "Instrumental":
-            final_lyrics = "[Instrumental]"
+            # 抓取前兩個樂器來做互動，讓音樂更有層次
+            main_inst = insts[0].split()[-1].capitalize() if insts else "Instrument"
+            second_inst = insts[1].split()[-1].capitalize() if len(insts) > 1 else "Rhythm section"
+            
+            # 完整的 10 段式長時長樂曲結構
+            final_lyrics = (
+                f"[Intro]\n(Atmospheric buildup, introducing the {main_inst})\n\n"
+                f"[Verse 1]\n(Steady rhythm, melodic {main_inst} playing softly)\n\n"
+                f"[Pre-Chorus]\n(Building tension, {second_inst} joins in)\n\n"
+                f"[Chorus]\n(Full band instrumental, energetic and wide)\n\n"
+                f"[Verse 2]\n(Rhythmic variation, deeper groove)\n\n"
+                f"[Chorus]\n(Full band instrumental, driving force)\n\n"
+                f"[Bridge]\n(Breakdown, quiet and emotional textures, stripping back the beat)\n\n"
+                f"[Instrumental Solo]\n(Passionate {main_inst} solo!)\n\n"
+                f"[Final Chorus]\n(Epic climax, all instruments playing at maximum energy)\n\n"
+                f"[Outro]\n(Gradual fade out, lingering {main_inst} notes)"
+            )
             
         elif vocal_mode == "Choir/Humming":
-            # 內建的簡單人聲模式（可以根據語言調整提示文字）
+            # 擴充版無字人聲/合唱結構 (7~8段)，防止 AI 提早沒詞唱
             if language == "en":
-                final_lyrics = "[Intro]\n(Epic Choir vocalizing...)\n\n[Verse]\n(Soft humming)\n\n[Chorus]\n(Powerful Choir singing Ahhh and Ohhh)\n\n[Outro]\n(Fading vocalizing)"
+                final_lyrics = (
+                    "[Intro]\n(Ethereal vocalizing...)\n\n"
+                    "[Verse 1]\n(Soft rhythmic humming: mmm...)\n\n"
+                    "[Chorus]\n(Powerful Choir singing Ahhh, wordless)\n\n"
+                    "[Verse 2]\n(Deep resonant humming, slowly building)\n\n"
+                    "[Chorus]\n(Epic Choir singing Ohhh, maximum emotion)\n\n"
+                    "[Bridge]\n(Solo haunting voice vocalizing smoothly)\n\n"
+                    "[Final Chorus]\n(Massive Choir chanting Ahhh and Ohhh together!)\n\n"
+                    "[Outro]\n(Fading breathy vocals... mmm...)"
+                )
             elif language == "zh":
-                final_lyrics = "[前奏]\n(史詩合唱人聲...)\n\n[主歌]\n(輕柔哼唱)\n\n[副歌]\n(強力合唱唱出啊啊和喔喔)\n\n[尾奏]\n(人聲漸弱)"
+                final_lyrics = (
+                    "[前奏]\n(空靈的無字吟唱...)\n\n"
+                    "[主歌 1]\n(輕柔的節奏哼唱：嗯...)\n\n"
+                    "[副歌]\n(氣勢磅礴的合唱 啊，無歌詞)\n\n"
+                    "[主歌 2]\n(低沉的共鳴哼唱，情緒逐漸堆疊)\n\n"
+                    "[副歌]\n(史詩級合唱 喔，情感釋放)\n\n"
+                    "[橋段]\n(單一聲線的幽美吟唱，穿透力強)\n\n"
+                    "[最後副歌]\n(全體大合唱 啊與喔，推向最高潮！)\n\n"
+                    "[尾奏]\n(氣音漸弱... 嗯...)"
+                )
             elif language == "jp":
-                final_lyrics = "[イントロ]\n(壮大な合唱ボーカル...)\n\n[バース]\n(優しいハミング)\n\n[コーラス]\n(力強い合唱でアーとオー)\n\n[アウトロ]\n(ボーカルフェードアウト)"
+                final_lyrics = (
+                    "[イントロ]\n(幻想的なスキャット...)\n\n"
+                    "[バース 1]\n(優しいハミング：んー...)\n\n"
+                    "[コーラス]\n(力強い合唱 アー、歌詞なし)\n\n"
+                    "[バース 2]\n(深みのあるハミング、徐々に盛り上がる)\n\n"
+                    "[コーラス]\n(壮大な合唱 オー、感情の爆発)\n\n"
+                    "[ブリッジ]\n(透き通るようなソロのボーカライズ)\n\n"
+                    "[ラストコーラス]\n(大合唱でアーとオー、最高潮！)\n\n"
+                    "[アウトロ]\n(息づかいのフェードアウト... んー...)"
+                )
+            
             
         elif vocal_mode == "Full Lyrics":
             # 根據選擇的語言決定要讀取的目錄
@@ -206,18 +318,46 @@ class AceStep15PromptGenerator:
                 # 從 JSON 中抽取一個骨架
                 structure = rng.choice(wildcards_data.get("structures", ["[Verse]\n{verse}\n\n[Chorus]\n{chorus}"]))
                 
-                # 動態替換 {tag}。使用正則表達式，確保每次遇到 {verse} 時都會重新抽取一次隨機句子
-                def replace_tag(match):
-                    tag_name = match.group(1)
-                    if tag_name in wildcards_data and isinstance(wildcards_data[tag_name], list) and wildcards_data[tag_name]:
-                        picked = rng.choice(wildcards_data[tag_name])
-                        # 防呆機制：如果抽到的東西還是陣列 (list)，就取出它的第一筆轉成字串
-                        if isinstance(picked, list):
-                            return str(picked[0]) if picked else ""
-                        return str(picked)
-                    return match.group(0) # 如果找不到對應的標籤庫，保持原樣
+                # 1. 將整首歌按雙換行拆分為獨立區塊 (如 [Verse 1], [Chorus]...)
+                sections = structure.split("\n\n")
+                processed_sections = []
+
+                for section in sections:
+                    # 2. 為當前區塊建立獨立的抽樣池
+                    section_pools = {}
+                    
+                    def replace_tag_block(match):
+                        tag_name = match.group(1)
+                        if tag_name in wildcards_data and isinstance(wildcards_data[tag_name], list) and wildcards_data[tag_name]:
+                            
+                            # 如果這個標籤在當前區塊還沒建立抽樣池，就建一個並打亂
+                            if tag_name not in section_pools:
+                                pool = list(wildcards_data[tag_name]) # 複製一份詞庫
+                                rng.shuffle(pool)                     # 隨機打亂
+                                section_pools[tag_name] = pool
+
+                            # 如果池子抽乾了 (防呆: 區塊內需要的句子數量 > 詞庫總量)
+                            if not section_pools[tag_name]:
+                                pool = list(wildcards_data[tag_name])
+                                rng.shuffle(pool)
+                                section_pools[tag_name] = pool
+
+                            # 3. 彈出一個詞 (保證當前池內不重複)
+                            picked = section_pools[tag_name].pop()
+                            
+                            # 防呆機制：處理巢狀陣列情況
+                            if isinstance(picked, list):
+                                return str(picked[0]) if picked else ""
+                            return str(picked)
+                            
+                        return match.group(0) # 如果找不到對應標籤，保持原樣
+
+                    # 處理單個區塊
+                    processed_section = re.sub(r'\{([^}]+)\}', replace_tag_block, section)
+                    processed_sections.append(processed_section)
                 
-                final_lyrics = re.sub(r'\{([^}]+)\}', replace_tag, structure)
+                # 4. 將處理完的區塊重新組裝成完整的歌詞
+                final_lyrics = "\n\n".join(processed_sections)
                 
             except (FileNotFoundError, json.JSONDecodeError) as e:
                 # 防呆機制：如果找不到 JSON 檔案，或是 JSON 格式寫錯，退回使用內建備用庫
@@ -230,7 +370,8 @@ class AceStep15PromptGenerator:
                 )
 
         # 返回參數中增加 language
-        return (final_prompt, final_lyrics, bpm, keyscale, language, genre, mood)
+        return (final_prompt, final_lyrics, bpm, keyscale, language, selected_genre, selected_mood)
+
 
 # 節點註冊
 NODE_CLASS_MAPPINGS = {
