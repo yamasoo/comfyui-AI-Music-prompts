@@ -5,6 +5,10 @@ import torch
 import av  
 
 class AceStepAudioTextSaver:
+    def __init__(self):
+        self.output_dir = folder_paths.get_output_directory()
+        self.type = "output"
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -23,23 +27,21 @@ class AceStepAudioTextSaver:
             }
         }
 
-    RETURN_TYPES = ()
-    RETURN_NAMES = ()
+    # 修改 1: 雖然是存檔節點，但回傳 UI 數據需要定義 return_types
+    # 我們可以回傳原本的 AUDIO，方便鏈接其他節點
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = ("audio",)
     FUNCTION = "save_all"
-    OUTPUT_NODE = True
+    OUTPUT_NODE = True  # 這點非常重要，標記為輸出節點
     CATEGORY = "AceStep/Audio"
 
     def save_all(self, audio, genre, mood, language, bpm, keyscale, prompt, lyrics, sub_folder):
-
-        # 1. 取得 ComfyUI 標準輸出目錄
-        output_dir = folder_paths.get_output_directory()
-
-        full_output_path = os.path.join(output_dir, sub_folder)
+        # 1. 處理路徑
+        full_output_path = os.path.join(self.output_dir, sub_folder)
         os.makedirs(full_output_path, exist_ok=True)
 
-        # 2. 自動編號檔名
+        # 2. 自動編號檔名邏輯 (保持你的原始邏輯)
         prefix = f"{genre}_{mood}_{language}_"
-
         try:
             existing = [
                 f for f in os.listdir(full_output_path)
@@ -60,11 +62,10 @@ class AceStepAudioTextSaver:
         full_audio_path = os.path.join(full_output_path, filename)
         full_text_path = os.path.join(full_output_path, txt_filename)
 
-        # 3. 音頻處理
+        # 3. 音頻處理與存檔 (PyAV)
         waveform = audio["waveform"]
         sample_rate = audio["sample_rate"]
 
-        # 保證 tensor 形狀正確
         if waveform.dim() == 3:
             waveform = waveform.squeeze(0)
 
@@ -75,7 +76,6 @@ class AceStepAudioTextSaver:
         stream.bit_rate = 320000
 
         layout = "stereo" if audio_data.shape[0] == 2 else "mono"
-
         frame = av.AudioFrame.from_ndarray(
             audio_data.numpy(),
             format="fltp",
@@ -85,10 +85,8 @@ class AceStepAudioTextSaver:
 
         for packet in stream.encode(frame):
             container.mux(packet)
-
         for packet in stream.encode():
             container.mux(packet)
-
         container.close()
 
         # 4. 儲存 metadata 文字
@@ -105,5 +103,19 @@ class AceStepAudioTextSaver:
         with open(full_text_path, "w", encoding="utf-8") as f:
             f.write(metadata_content)
 
-        # ★ 必須回傳 tuple（不能是 None）
-        return ()
+        # 修改 2: 回傳關鍵的 UI 字典
+        # filename 必須是相對於 output 目錄的相對路徑
+        return {
+            "ui": {
+                "audio": [
+                    {
+                        "filename": filename,
+                        "subfolder": sub_folder,
+                        "type": self.type
+                    }
+                ]
+            },
+            "result": (audio,) 
+        }
+
+# 記得在 __init__.py 中註冊此類
