@@ -23,9 +23,10 @@ class AceStep15PromptGenerator:
         "jp": "lyrics_wildcards_jp"
     }
 
-    # --- 擴展後的自然語言語料庫 (保留了16種曲風的強大描述) ---
+    # --- 擴展後的自然語言語料庫 ---
     GENRE_DATA = {
         "Pop_流行": {"bpm": (90, 128), "instruments": ["shiny synthesizers", "a catchy bass groove", "crisp electronic beats", "acoustic guitar strums", "lush vocal harmonies", "a bright piano melody"], "vibes": ["polished and commercial", "radio-friendly and catchy", "modern and sleek", "bouncy and vibrant"], "dynamics": ["flows smoothly with an infectious hook", "builds to a euphoric chorus", "keeps a steady, danceable groove"]},
+        "K-Pop_韓流": {"bpm": (95, 140), "instruments": ["punchy EDM synths", "tight trap hi-hats", "melodic vocal chops", "orchestral string hits", "bass-heavy drops"], "vibes": ["polished and high-energy", "synchronized and flashy", "youthful and addictive", "futuristic and sleek"], "dynamics": ["explodes into a perfectly engineered hook", "transitions sharply between rap verses and soaring choruses", "maintains relentless idol-group intensity"]},
         "RandB_節奏藍調": {"bpm": (60, 90), "instruments": ["smooth Rhodes piano", "a deep synth bass", "syncopated drum machine beats", "silky vocal runs", "subtle electric guitar licks"], "vibes": ["sensual and smooth", "soulful and deep", "intimate and groovy", "late-night and atmospheric"], "dynamics": ["glides effortlessly through lush chords", "builds emotional intensity in the bridge", "maintains a steady, head-nodding bounce"]},
         "Hip-Hop_嘻哈": {"bpm": (80, 100), "instruments": ["a heavy boom-bap drum break", "a deep sub bass", "vinyl-sampled piano loops", "scratching elements", "punchy kick drums"], "vibes": ["gritty and street-smart", "classic and nostalgic", "heavy and rhythmic", "swagger-filled and confident"], "dynamics": ["rides a relentless drum pocket", "switches up the sample in the hook", "keeps a consistent, head-bobbing groove"]},
         "Trap_陷阱音樂": {"bpm": (130, 150), "instruments": ["rattling hi-hat rolls", "a massive 808 bass", "dark synth bells", "snappy snare drums", "pitch-bent brass"], "vibes": ["dark and menacing", "bouncy and aggressive", "modern and club-ready", "heavy and hypnotic"], "dynamics": ["drops hard into a bass-heavy chorus", "maintains tension with sparse verses", "hits with relentless percussive energy"]},
@@ -170,8 +171,8 @@ class AceStep15PromptGenerator:
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "genre": (["Random"] + list(cls.GENRE_DATA.keys()), {"default": "Random"}),
                 "mood": (["Random"] + list(cls.MOOD_DATA.keys()), {"default": "Random"}),
-                "vocal_mode": (["Full Lyrics", "Instrumental", "Choir/Humming"], {"default": "Full Lyrics"}),
-                "language": (["en", "zh", "jp"], {"default": "en", "tooltip": "選擇歌詞語言"}),
+                "vocal_mode": (["Random", "Full Lyrics", "All Lyrics", "Instrumental", "Choir/Humming"], {"default": "Full Lyrics"}),
+                "language": (["Random", "en", "zh", "jp"], {"default": "en", "tooltip": "選擇歌詞語言（Random 會隨機抽選一種）"}),
                 "prompt_style": (["Random", "Standard_標準", "Structured_結構化", "Groove_節奏律動", "Cinematic_電影敘事", "Vintage_復古類比"], {"default": "Random"}),
                 "vocal_timbre": (["Random", "None"] + list(cls.VOCAL_TIMBRE_MAP.keys()), {"default": "Random", "tooltip": "指定歌手聲線特徵"}),
             },
@@ -200,6 +201,13 @@ class AceStep15PromptGenerator:
         mood_info = self.MOOD_DATA[selected_mood]
         root = rng.choice(self.ROOT_NOTES)
         keyscale = f"{root} {mood_info['scale']}"
+
+        # 處理 language Random 抽選
+        language = language if language != "Random" else rng.choice(["en", "zh", "jp"])
+
+        # 處理 vocal_mode Random 抽選
+        if vocal_mode == "Random":
+            vocal_mode = rng.choice(["Full Lyrics", "All Lyrics", "Instrumental", "Choir/Humming"])
 
         # 👇 2. 新增：處理人聲特徵 (防呆邏輯)
         actual_vocal_string = ""
@@ -245,6 +253,7 @@ class AceStep15PromptGenerator:
         
         # --- 2. 生成歌詞 (支援長時長生成的擴展結構版) ---
         final_lyrics = ""
+        json_genre_name = selected_genre.encode("ascii", errors="ignore").decode().rstrip("_").lower().strip()
 
         if vocal_mode == "Instrumental":
             # 抓取前兩個樂器來做互動，讓音樂更有層次
@@ -369,8 +378,56 @@ class AceStep15PromptGenerator:
                     power_phrase=theme_data["phrase"]
                 )
 
+        elif vocal_mode == "All Lyrics":
+            # 與 Full Lyrics 相同邏輯，但固定讀取 all.json
+            lang_dir_name = self.LANG_DIRS.get(language, "lyrics_wildcards_en")
+            wildcards_dir = os.path.join(self.BASE_DIR, lang_dir_name)
+            json_file_path = os.path.join(wildcards_dir, "all.json")
+
+            try:
+                with open(json_file_path, 'r', encoding='utf-8') as f:
+                    wildcards_data = json.load(f)
+
+                structure = rng.choice(wildcards_data.get("structures", ["[Verse]\n{verse}\n\n[Chorus]\n{chorus}"]))
+                sections = structure.split("\n\n")
+                processed_sections = []
+
+                for section in sections:
+                    section_pools = {}
+
+                    def replace_tag_block_all(match):
+                        tag_name = match.group(1)
+                        if tag_name in wildcards_data and isinstance(wildcards_data[tag_name], list) and wildcards_data[tag_name]:
+                            if tag_name not in section_pools:
+                                pool = list(wildcards_data[tag_name])
+                                rng.shuffle(pool)
+                                section_pools[tag_name] = pool
+                            if not section_pools[tag_name]:
+                                pool = list(wildcards_data[tag_name])
+                                rng.shuffle(pool)
+                                section_pools[tag_name] = pool
+                            picked = section_pools[tag_name].pop()
+                            if isinstance(picked, list):
+                                return str(picked[0]) if picked else ""
+                            return str(picked)
+                        return match.group(0)
+
+                    processed_section = re.sub(r'\{([^}]+)\}', replace_tag_block_all, section)
+                    processed_sections.append(processed_section)
+
+                final_lyrics = "\n\n".join(processed_sections)
+
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                print(f"[ACE-Step Generator] Warning: 無法讀取 all.json in {lang_dir_name} ({e})。正在使用備用歌詞庫。")
+                theme_data = rng.choice(list(self.FALLBACK_THEMES.values()))
+                final_lyrics = self.FALLBACK_TEMPLATES["Standard"].format(
+                    theme_line_1=theme_data["lines"][0],
+                    theme_line_2=theme_data["lines"][1],
+                    power_phrase=theme_data["phrase"]
+                )
+
         # 返回參數中增加 language
-        return (final_prompt, final_lyrics, bpm, keyscale, language, selected_genre, selected_mood)
+        return (final_prompt, final_lyrics, bpm, keyscale, language, json_genre_name, selected_mood.split('_')[0])
 
 
 # 節點註冊
