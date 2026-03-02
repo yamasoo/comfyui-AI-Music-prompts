@@ -1,0 +1,4 @@
+# 忽略所有語言的 wildcards 目錄
+lyrics_wildcards_en/
+lyrics_wildcards_jp/
+lyrics_wildcards_zh/
