@@ -1,128 +1,135 @@
+# ACE-Step 1.5 Auto-Producer
 
-這是一份為您的 GitHub 專案量身打造的 `README.md` 更新文案。內容結合了您在 **V02** 版本中所做的重大改進，並採用專業且易於閱讀的 Markdown 格式。
+這是一個專為 ComfyUI 設計的 AI 音樂生成輔助節點，能自動產生自然語言 Prompt、支援多語言歌詞、並可將生成結果直接保存為 MP3 與 metadata 文本。
 
----
+## 功能亮點
 
-# 🎹 ACE-Step 1.5 Auto-Producer (Multi-language)
+- 自動生成專業風格的音樂 Prompt
+- 支援多種音樂曲風與情緒設定
+- 支援英文 / 繁體中文 / 日本語
+- 可選擇 Full Lyrics、All Lyrics、Instrumental、Choir/Humming
+- 可輸入 vocal_timbre 與 prompt_style
+- 可將生成結果直接輸出為 MP3 與 .txt metadata
+- 內建 fallback 機制，避免 wildcard JSON 缺失時直接崩潰
 
-這是一個專為 ComfyUI 設計的 AI 音樂生成輔助插件，旨在透過專業的自然語言 Prompt 生成與自動化語法結構，提升 AI 音樂創作的效率與多樣性。
+## 節點列表
 
-## 🚀 V1.5 (V02) 版本更新亮點
+### 1) AceStep15PromptGenerator
 
-### 1. 核心生成引擎升級 (`AceStep15PromptGenerator`)
+用途：產生 Prompt、BPM、Key、Language、Genre、Mood 與歌詞內容。
 
-* 
-**多維度人聲特徵控制**：新增 `vocal_timbre` 參數，可指定包括空靈女聲、深沉男聲、合唱、男女對唱等 8 種專業聲線標籤 。
+輸入：
+- seed
+- genre
+- mood
+- vocal_mode
+- language
+- prompt_style
+- vocal_timbre
+- extra_prompt
 
+輸出：
+- prompt
+- lyrics
+- bpm
+- keyscale
+- language
+- genre
+- mood
 
-* 
-**多樣化提示詞風格**：新增 `prompt_style` 切換，支援「標準」、「結構化」、「節奏律動」、「電影敘事」與「復古類比」等 5 種提示詞模板 。
+### 2) AceStepAudioTextSaver
 
+用途：將音訊與 metadata 一併保存到輸出資料夾。
 
-* 
-**長時長樂曲結構設計**：針對長音訊生成需求，重新設計了器樂 (Instrumental) 與哼唱 (Choir) 模式的段落分配，提供高達 10 段式的完整結構，避免生成中斷 。
+輸入：
+- audio
+- genre
+- mood
+- language
+- bpm
+- keyscale
+- prompt
+- lyrics
+- sub_folder
 
+輸出：
+- audio
 
-* 
-**智慧歌詞防重複機制**：優化了歌詞抽樣邏輯，各段落擁有獨立抽樣池並加入隨機打亂功能，確保歌詞內容具備高度文學多樣性 。
+## 安裝方式
 
-
-* 
-**新增特殊曲風**：特別收錄了 **銀英 ED 風格 (LOGH_EDStyle)**、演歌、蘇格蘭風格等獨特預設 。
-
-
-
-### 2. 儲存與預覽優化 (`AceStepAudioTextSaver`)
-
-* 
-**即時 UI 預覽**：節點現在支援回傳 UI 數據，儲存後的 MP3 音訊會直接顯示在 ComfyUI 節點下方的播放器中，方便立即試聽 。
-
-
-* 
-**工作流鏈接增強**：新增 `AUDIO` 輸出端口，允許將儲存後的音頻數據繼續傳遞至後續處理節點 。
-
-
-* 
-**自動編號防崩潰邏輯**：強化了檔案系統的編號檢查，確保在複雜目錄結構下的存檔穩定性 。
-
-
-
----
-
-## 🛠️ 功能說明
-
-| 功能模組 | 說明 |
-| --- | --- |
-| **多語言支援** | 完整支援英文 (en)、繁體中文 (zh)、日文 (jp) 的歌詞與提示詞生成 。
-
- |
-| **豐富語料庫** | 內建超過 40 種音樂曲風 (Genre) 與 20 種情緒 (Mood) 的專業描述語法 。
-
- |
-| **自動化 Metadata** | 自動生成與 MP3 同名的 `.txt` 檔案，完整記錄曲風、情緒、BPM、Key 以及歌詞與 Prompt 。
-
- |
-| **高相容性類型** | 使用 `AnyType` 偽裝技術，確保與各類 ComfyUI 擴充插件的類型檢查系統相容 。
-
- |
-
----
-
-## 📦 安裝與使用
-
-1. 將此資料夾放置於 ComfyUI 的 `custom_nodes` 目錄下。
-2. 確保已安裝 `av` (PyAV) 函式庫以支援 MP3 編碼 。
-
-
-3. 在 ComfyUI 中搜尋 `ACE-Step` 即可開始使用 。
-
-
-
----
-
-**這份文案可以幫助開發者快速了解您 V02 版的技術價值。您需要我幫您補充如何撰寫歌詞 JSON 擴充文件的說明到 README 中嗎？**
-## 📦 安裝與使用
-
-1. 將此資料夾放置於 ComfyUI 的 `custom_nodes` 目錄下。
-2. 確保已安裝 `av` (PyAV) 函式庫以支援 MP3 編碼 。
-
-
-3. 在 ComfyUI 中搜尋 `ACE-Step` 即可開始使用 。
-
-
-
----
-
-**這份文案可以幫助開發者快速了解您 V02 版的技術價值。您需要我幫您補充如何撰寫歌詞 JSON 擴充文件的說明到 README 中嗎？**
----
-
-## 📦 安裝與使用
-
-1. 將此資料夾放置於 ComfyUI 的 `custom_nodes` 目錄下。
-2. 確保已安裝 `av` (PyAV) 函式庫以支援 MP3 編碼 。
-
-
-3. 在 ComfyUI 中搜尋 `ACE-Step` 即可開始使用 。
-
-
-
----
-
-**這份文案可以幫助開發者快速了解您 V02 版的技術價值。您需要我幫您補充如何撰寫歌詞 JSON 擴充文件的說明到 README 中嗎？**
-
-
-# ComfyUI-AI-Music-prompts (ACE-Step 1.5)
-
-這是一個專為 **ACE-Step 1.5** 音樂生成模型設計的 ComfyUI 擴充節點。它能自動生成高質量的自然語言 Prompt，並支持多語言歌詞與自動化存檔功能。
-
-## ✨ 功能亮點
-- **專業級 Prompt 生成**：針對 16 種不同音樂曲風（如 Pop, Rock, Lo-fi, Metal 等）自動適配 BPM、樂器組合與動態描述。
-- **多語言歌詞支持**：支持 English (EN)、繁體中文 (ZH)、日本語 (JP)，並可透過外部 JSON 詞庫自定義擴充。
-- **自動化存檔系統**：一鍵儲存 MP3 音檔與對應的 Metadata（包含歌詞、BPM、Key、Prompt），方便後續管理。
-- **防呆機制**：內建備用語料庫，即使外部 JSON 讀取失敗也能正常運作。
-
-## 🛠 安裝方法
-1. 進入你的 ComfyUI 安裝目錄下的 `custom_nodes` 資料夾。
-2. 開啟終端機並執行：
+1. 將本專案放進 ComfyUI 的 custom_nodes 資料夾。
+2. 確認已安裝依賴：
    ```bash
-   git clone https://github.com/yamasoo/comfyui-AI-Music-prompts.git
+   pip install av
+   ```
+3. 啟動 ComfyUI 後，在節點面板中搜尋：
+   - ACE-Step 1.5 Auto-Producer
+   - ACE-Step Audio & Metadata Saver
+
+## 使用流程
+
+1. 先使用 AceStep15PromptGenerator 產生 Prompt 與 Lyrics。
+2. 將輸出接到後續的音樂生成流程。
+3. 以音訊輸出接到 AceStepAudioTextSaver。
+4. 儲存後，系統會自動生成：
+   - .mp3
+   - 同名 .txt metadata 檔
+
+## metadata 格式
+
+產生的 .txt 內容會包含：
+- Genre
+- Mood
+- Language
+- BPM
+- Key
+- Prompt
+- Lyrics
+
+## wildcards / lyrics JSON
+
+當 vocal_mode 為 Full Lyrics 或 All Lyrics 時，系統會嘗試讀取 lyrics_wildcards_en / lyrics_wildcards_zh / lyrics_wildcards_jp 下的 JSON 檔案。
+
+如果找不到對應檔案或 JSON 內容錯誤，會自動使用 fallback 歌詞，不會導致整個節點失效。
+
+## 常見問題
+
+### 1) 找不到 JSON 檔
+
+這通常是因為：
+- 目錄名稱不一致
+- 檔名大小寫不同
+- genre 名稱與實際 JSON 檔名略有差異
+
+現在已增加 fallback 與候選檔名解析，能容忍小幅差異。
+
+### 2) 節點載入失敗
+
+請確認：
+- 檔案位於 custom_nodes 下
+- Python 可正常 import 本模組
+- 沒有語法錯誤
+- av 套件已安裝
+
+### 3) Prompt 或歌詞不符合預期
+
+請確認：
+- genre 是否為可用值
+- mood 是否為可用值
+- language 是否為 en / zh / jp
+- vocal_mode 是否正確
+
+## 注意事項
+
+- 本插件依賴 ComfyUI 的節點執行環境。
+- 若你自行新增曲風或歌詞 JSON，建議維持清楚的命名規則。
+- 若要長期維護，建議將 wildcards JSON 做成穩定命名與資料結構規範。
+
+## 結論
+
+這個專案的核心價值在於：
+- 將 AI 音樂創作流程自動化
+- 讓 Prompt 與 Lyrics 能更可控
+- 並保留可維護與可擴充的結構
+
+如需擴充曲風或語言，請直接新增對應的 genre 定義與 wildcard JSON。
