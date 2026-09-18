@@ -335,6 +335,20 @@ class AceStep15PromptGenerator:
         return name.lower() or "generic"
 
     @staticmethod
+    def _safe_candidate_names(name):
+        value = str(name or "").strip()
+        if not value:
+            return []
+        normalized = re.sub(r"\s+", "_", value)
+        normalized = re.sub(r"[^A-Za-z0-9_-]", "", normalized)
+        normalized = normalized.strip("_").strip("-")
+        names = []
+        for candidate in [normalized, normalized.lower(), normalized.replace("_", "-"), normalized.lower().replace("_", "-")]:
+            if candidate and candidate not in names:
+                names.append(candidate)
+        return names
+
+    @staticmethod
     def _ensure_instruments(genre_info):
         base = list(genre_info.get("instruments") or ["synthesizer", "bass", "drums"])
         if len(base) >= 3:
@@ -388,23 +402,48 @@ class AceStep15PromptGenerator:
 
         return "\n\n".join(processed_sections)
 
-    def _load_lyrics_from_mode(self, language, vocal_mode, rng, selected_genre):
+    def _resolve_wildcard_path(self, language, vocal_mode, selected_genre):
         lang_dir_name = self.LANG_DIRS.get(language, "lyrics_wildcards_en")
-        wildcards_dir = os.path.join(self.BASE_DIR, lang_dir_name)
+        candidate_dirs = [
+            os.path.join(self.BASE_DIR, lang_dir_name),
+            os.path.join(self.BASE_DIR, "lyrics_wildcards"),
+            self.BASE_DIR,
+        ]
 
         if vocal_mode == "Full Lyrics":
-            file_name = f"{self._genre_json_name(selected_genre)}.json"
+            genre_names = self._safe_candidate_names(selected_genre)
+            file_names = []
+            for name in genre_names:
+                file_names.extend([f"{name}.json", f"{name.lower()}.json", f"{name}.JSON", f"{name.lower()}.JSON"])
+            file_names.extend(["all.json", "all.JSON", "lyrics.json", "lyrics.JSON"])
         else:
-            file_name = "all.json"
+            file_names = ["all.json", "all.JSON", "lyrics.json", "lyrics.JSON"]
 
-        json_path = os.path.join(wildcards_dir, file_name)
+        seen = set()
+        for directory in candidate_dirs:
+            if not os.path.isdir(directory):
+                continue
+            for file_name in file_names:
+                file_path = os.path.join(directory, file_name)
+                if file_path in seen:
+                    continue
+                seen.add(file_path)
+                if os.path.isfile(file_path):
+                    return file_path
+        return None
+
+    def _load_lyrics_from_mode(self, language, vocal_mode, rng, selected_genre):
+        json_path = self._resolve_wildcard_path(language, vocal_mode, selected_genre)
+        if json_path is None:
+            print(f"[ACE-Step Generator] Warning: No wildcard JSON found for language={language}, mode={vocal_mode}. Falling back to default lyrics.")
+            return self._fallback_lyrics(rng)
 
         try:
             with open(json_path, "r", encoding="utf-8") as handle:
                 wildcards_data = json.load(handle)
             return self._build_lyrics_from_json(json_path, wildcards_data, rng)
         except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
-            print(f"[ACE-Step Generator] Warning: Unable to read {file_name} in {lang_dir_name} ({exc}). Falling back to default lyrics.")
+            print(f"[ACE-Step Generator] Warning: Unable to read wildcard JSON {json_path} ({exc}). Falling back to default lyrics.")
             return self._fallback_lyrics(rng)
 
     def generate_ace_params(self, seed, genre, mood, vocal_mode, language, prompt_style, vocal_timbre, extra_prompt=""):
@@ -523,17 +562,7 @@ class AceStep15PromptGenerator:
                 )
 
         elif vocal_mode in ("Full Lyrics", "All Lyrics"):
-            wildcards_dir = os.path.join(self.BASE_DIR, self.LANG_DIRS.get(language, "lyrics_wildcards_en"))
-            file_name = f"{json_genre_name}.json" if vocal_mode == "Full Lyrics" else "all.json"
-            json_path = os.path.join(wildcards_dir, file_name)
-
-            try:
-                with open(json_path, "r", encoding="utf-8") as handle:
-                    wildcards_data = json.load(handle)
-                final_lyrics = self._build_lyrics_from_json(json_path, wildcards_data, rng)
-            except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
-                print(f"[ACE-Step Generator] Warning: Unable to read {file_name} in {self.LANG_DIRS.get(language, 'lyrics_wildcards_en')} ({exc}). Falling back to default lyrics.")
-                final_lyrics = self._fallback_lyrics(rng)
+            final_lyrics = self._load_lyrics_from_mode(language, vocal_mode, rng, selected_genre)
 
         return (final_prompt, final_lyrics, bpm, keyscale, language, json_genre_name, selected_mood.split("_")[0])
 
