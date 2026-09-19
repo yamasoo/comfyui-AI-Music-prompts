@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+from fractions import Fraction
 
 import av
 import folder_paths
@@ -144,14 +145,19 @@ class AceStepAudioTextSaver:
             try:
                 with av.open(full_audio_path, mode="w", format=output_format) as container:
                     stream = container.add_stream(output_format, rate=sample_rate)
+                    stream.time_base = Fraction(1, sample_rate)
                     if output_format == "mp3":
                         stream.bit_rate = 320000
+
                     frame = av.AudioFrame.from_ndarray(
                         waveform.numpy(),
                         format="fltp",
                         layout=layout,
                     )
                     frame.sample_rate = sample_rate
+                    frame.time_base = Fraction(1, sample_rate)
+                    frame.pts = 0
+
                     for packet in stream.encode(frame):
                         container.mux(packet)
                     for packet in stream.encode():
