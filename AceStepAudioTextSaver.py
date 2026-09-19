@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 
 import av
 import folder_paths
@@ -22,6 +23,7 @@ class AceStepAudioTextSaver:
                 "keyscale": ("STRING", {"forceInput": True}),
                 "prompt": ("STRING", {"forceInput": True}),
                 "lyrics": ("STRING", {"forceInput": True}),
+                "output_format": (["mp3", "flac"], {"default": "mp3"}),
             },
             "optional": {
                 "sub_folder": ("STRING", {"default": "AceStep_Output"}),
@@ -52,8 +54,8 @@ class AceStepAudioTextSaver:
         return normalized
 
     @staticmethod
-    def _next_index(output_dir, prefix):
-        pattern = re.compile(r"^" + re.escape(prefix) + r"(\d+)\.mp3$")
+    def _next_index(output_dir, prefix, extension):
+        pattern = re.compile(r"^" + re.escape(prefix) + r"(\d+)\." + re.escape(extension) + r"$")
         indices = []
         for name in os.listdir(output_dir):
             match = pattern.match(name)
@@ -78,7 +80,36 @@ class AceStepAudioTextSaver:
             raise ValueError(f"Expected mono or stereo audio, got shape {tuple(waveform.shape)}")
         return waveform.detach().cpu().float().contiguous()
 
-    def save_all(self, audio, genre, mood, language, bpm, keyscale, prompt, lyrics, sub_folder="AceStep_Output"):
+    @staticmethod
+    def _source_path(audio):
+        """Return a source file path when an upstream node provides one.
+
+        Most ComfyUI AUDIO values contain only decoded samples, so re-encoding is
+        unavoidable in that case. Nodes that retain the original file can provide
+        ``path`` or ``filename`` plus ``subfolder`` and will be copied losslessly
+        when the requested format is the same.
+        """
+        if not isinstance(audio, dict):
+            return None
+        path = audio.get("path")
+        if path and os.path.isfile(path):
+            return path
+        filename = audio.get("filename")
+        if not filename:
+            return None
+        subfolder = audio.get("subfolder", "")
+        for base in (folder_paths.get_input_directory(), folder_paths.get_output_directory()):
+            candidate = os.path.join(base, subfolder, filename)
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    def save_all(self, audio, genre, mood, language, bpm, keyscale, prompt, lyrics,
+                 output_format="mp3", sub_folder="AceStep_Output"):
+        output_format = str(output_format or "mp3").lower().lstrip(".")
+        if output_format not in ("mp3", "flac"):
+            raise ValueError("output_format must be mp3 or flac")
+
         safe_subfolder = self._safe_subfolder(sub_folder)
         full_output_path = os.path.join(self.output_dir, safe_subfolder)
         os.makedirs(full_output_path, exist_ok=True)
@@ -88,39 +119,48 @@ class AceStepAudioTextSaver:
             self._safe_component(mood),
             self._safe_component(language),
         )
-        next_idx = self._next_index(full_output_path, prefix)
-        filename = f"{prefix}{next_idx:03d}.mp3"
+        next_idx = self._next_index(full_output_path, prefix, output_format)
+        filename = f"{prefix}{next_idx:03d}.{output_format}"
         txt_filename = os.path.splitext(filename)[0] + ".txt"
         full_audio_path = os.path.join(full_output_path, filename)
         full_text_path = os.path.join(full_output_path, txt_filename)
 
         if not isinstance(audio, dict) or "waveform" not in audio or "sample_rate" not in audio:
             raise ValueError("audio must contain waveform and sample_rate")
-        waveform = self._normalise_waveform(audio["waveform"])
-        sample_rate = int(audio["sample_rate"])
-        if sample_rate <= 0:
-            raise ValueError(f"Invalid sample rate: {sample_rate}")
 
-        layout = "stereo" if waveform.shape[0] == 2 else "mono"
-        try:
-            with av.open(full_audio_path, mode="w", format="mp3") as container:
-                stream = container.add_stream("mp3", rate=sample_rate)
-                stream.bit_rate = 320000
-                frame = av.AudioFrame.from_ndarray(
-                    waveform.numpy(),
-                    format="fltp",
-                    layout=layout,
-                )
-                frame.sample_rate = sample_rate
-                for packet in stream.encode(frame):
-                    container.mux(packet)
-                for packet in stream.encode():
-                    container.mux(packet)
-        except Exception:
-            # Do not leave a misleading partial MP3 behind after an encode failure.
-            if os.path.exists(full_audio_path):
-                os.remove(full_audio_path)
-            raise
+        # An encoded source can be copied without decoding/re-encoding when its
+        # extension matches the requested output format.
+        source_path = self._source_path(audio)
+        source_format = os.path.splitext(source_path)[1].lower().lstrip(".") if source_path else None
+        if source_path and source_format == output_format:
+            shutil.copyfile(source_path, full_audio_path)
+        else:
+            waveform = self._normalise_waveform(audio["waveform"])
+            sample_rate = int(audio["sample_rate"])
+            if sample_rate <= 0:
+                raise ValueError(f"Invalid sample rate: {sample_rate}")
+
+            layout = "stereo" if waveform.shape[0] == 2 else "mono"
+            try:
+                with av.open(full_audio_path, mode="w", format=output_format) as container:
+                    stream = container.add_stream(output_format, rate=sample_rate)
+                    if output_format == "mp3":
+                        stream.bit_rate = 320000
+                    frame = av.AudioFrame.from_ndarray(
+                        waveform.numpy(),
+                        format="fltp",
+                        layout=layout,
+                    )
+                    frame.sample_rate = sample_rate
+                    for packet in stream.encode(frame):
+                        container.mux(packet)
+                    for packet in stream.encode():
+                        container.mux(packet)
+            except Exception:
+                # Do not leave a misleading partial audio file behind after an encode failure.
+                if os.path.exists(full_audio_path):
+                    os.remove(full_audio_path)
+                raise
 
         metadata_content = (
             f"Genre: {genre}\n"
