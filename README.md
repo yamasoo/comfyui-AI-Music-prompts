@@ -1,4 +1,7 @@
-v1.1.0 音訊輸出強化與生成流程修正
+# YuE2 with Cover V02：簡化版 YuE2 音樂生成與封面製作工作流程
+版本文件：https://github.com/yamasoo/comfyui-AI-Music-prompts/blob/main/RELEASE_YUE2_WITH_COVER_V02.md
+
+# v1.1.0 音訊輸出強化與生成流程修正
 
 這次更新主要提升音訊輸出穩定性與功能完整性，新增 MP3 / FLAC / MP4 輸出格式支援，並優化同格式來源直接複製的流程，避免不必要的重編碼與品質損失。
 
