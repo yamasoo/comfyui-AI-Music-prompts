@@ -1,4 +1,5 @@
 # YuE2 with Cover V02：簡化版 YuE2 音樂生成與封面製作工作流程
+https://github.com/yamasoo/comfyui-AI-Music-prompts/blob/main/yue2-with-cover_V02.json
 版本文件：https://github.com/yamasoo/comfyui-AI-Music-prompts/blob/main/RELEASE_YUE2_WITH_COVER_V02.md
 
 # v1.1.0 音訊輸出強化與生成流程修正
