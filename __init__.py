@@ -1,23 +1,17 @@
 import traceback
 
 try:
-    from .AceStep15Generator import AceStep15PromptGenerator
-    from .AceStepAudioTextSaver import AceStepAudioTextSaver
-    from .prompt_data import GENRE_DATA, MOOD_DATA
+    from . import AceStep15Generator, AceStepAudioTextSaver
 
-    # Keep the generator implementation focused while exposing the extended
-    # selectable genre and mood catalog from a dedicated data module.
-    AceStep15PromptGenerator.GENRE_DATA = GENRE_DATA
-    AceStep15PromptGenerator.MOOD_DATA = MOOD_DATA
-
+    # Each module owns its node classes and display names; merge them here so
+    # there is only one place to rename a node.
     NODE_CLASS_MAPPINGS = {
-        "AceStep15PromptGenerator": AceStep15PromptGenerator,
-        "AceStepAudioTextSaver": AceStepAudioTextSaver,
+        **AceStep15Generator.NODE_CLASS_MAPPINGS,
+        **AceStepAudioTextSaver.NODE_CLASS_MAPPINGS,
     }
-
     NODE_DISPLAY_NAME_MAPPINGS = {
-        "AceStep15PromptGenerator": "🎵 ACE-Step 1.5 Prompt Generator",
-        "AceStepAudioTextSaver": "💾 ACE-Step Audio & Metadata Saver",
+        **AceStep15Generator.NODE_DISPLAY_NAME_MAPPINGS,
+        **AceStepAudioTextSaver.NODE_DISPLAY_NAME_MAPPINGS,
     }
 
     __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

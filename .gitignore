@@ -1,9 +1,11 @@
-# 忽略所有語言的 wildcards 目錄
+# 歌詞 wildcards（體積大，另以壓縮檔提供）
 lyrics_wildcards_en/
 lyrics_wildcards_jp/
 lyrics_wildcards_zh/
-__pycache__/
-dist/*.exe
 
+# Python 快取
 __pycache__/
+*.pyc
+
+# 桌面播放器執行檔改放 GitHub Releases
 dist/*.exe
