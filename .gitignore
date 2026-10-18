@@ -2,3 +2,5 @@
 lyrics_wildcards_en/
 lyrics_wildcards_jp/
 lyrics_wildcards_zh/
+__pycache__/
+dist/*.exe
