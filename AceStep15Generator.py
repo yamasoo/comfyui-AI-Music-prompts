@@ -25,6 +25,9 @@ class AceStep15PromptGenerator:
         "jp": "lyrics_wildcards_jp",
     }
 
+    # 除錯開關：不想看 console 時改成 False
+    DEBUG_WILDCARD = True
+
     GENRE_DATA = {
         "Pop_流行": {
             "bpm": (90, 128),
@@ -324,6 +327,17 @@ class AceStep15PromptGenerator:
     FUNCTION = "generate_ace_params"
     CATEGORY = "AI Music/ACE-Step"
 
+    # ------------------------------------------------------------------ #
+    # Debug helpers
+    # ------------------------------------------------------------------ #
+    @classmethod
+    def _dbg(cls, *args):
+        if cls.DEBUG_WILDCARD:
+            print("[ACE-Step]", *args)
+
+    # ------------------------------------------------------------------ #
+    # Filename / path helpers
+    # ------------------------------------------------------------------ #
     @staticmethod
     def _genre_json_name(genre_name):
         name = str(genre_name or "").strip()
@@ -366,8 +380,12 @@ class AceStep15PromptGenerator:
             power_phrase=theme_data["phrase"],
         )
 
+    # ------------------------------------------------------------------ #
+    # Lyrics building
+    # ------------------------------------------------------------------ #
     def _build_lyrics_from_json(self, json_path, wildcards_data, rng):
         if not isinstance(wildcards_data, dict):
+            self._dbg(f"JSON root is not a dict in {json_path}; using fallback lyrics.")
             return self._fallback_lyrics(rng)
 
         structure = rng.choice(wildcards_data.get("structures", ["[Verse]\n{verse}\n\n[Chorus]\n{chorus}"]))
@@ -402,6 +420,9 @@ class AceStep15PromptGenerator:
 
         return "\n\n".join(processed_sections)
 
+    # ------------------------------------------------------------------ #
+    # Wildcard resolution
+    # ------------------------------------------------------------------ #
     def _resolve_wildcard_path(self, language, vocal_mode, selected_genre):
         lang_dir_name = self.LANG_DIRS.get(language, "lyrics_wildcards_en")
         candidate_dirs = [
@@ -419,33 +440,253 @@ class AceStep15PromptGenerator:
         else:
             file_names = ["all.json", "all.JSON", "lyrics.json", "lyrics.JSON"]
 
+        self._dbg("=" * 70)
+        self._dbg(f"resolve: language={language}, vocal_mode={vocal_mode}, genre={selected_genre}")
+        self._dbg(f"BASE_DIR       = {self.BASE_DIR}")
+        self._dbg(f"candidate_dirs = {candidate_dirs}")
+        self._dbg(f"file_names     = {file_names}")
+
         seen = set()
         for directory in candidate_dirs:
-            if not os.path.isdir(directory):
+            dir_exists = os.path.isdir(directory)
+            self._dbg(f"  -> dir: {directory} (exists={dir_exists})")
+            if not dir_exists:
                 continue
+
+            # 列出該目錄的實際 json 檔名，方便比對大小寫/底線
+            try:
+                actual_files = sorted(
+                    f for f in os.listdir(directory)
+                    if f.lower().endswith(".json")
+                )
+            except OSError as exc:
+                actual_files = []
+                self._dbg(f"     listdir failed: {exc}")
+            self._dbg(f"     json files in dir: {actual_files}")
+
             for file_name in file_names:
                 file_path = os.path.join(directory, file_name)
                 if file_path in seen:
                     continue
                 seen.add(file_path)
-                if os.path.isfile(file_path):
+                exists = os.path.isfile(file_path)
+                self._dbg(f"     try: {file_path} -> {exists}")
+                if exists:
+                    self._dbg(f"HIT: {file_path}")
+                    self._dbg("=" * 70)
                     return file_path
+
+        self._dbg("MISS: no wildcard JSON matched any candidate.")
+        self._dbg("=" * 70)
         return None
+
+    # ------------------------------------------------------------------ #
+    # Wordless modes (Choir/Humming, Instrumental):
+    # reuse the "structures" already defined in the lyric wildcard JSON.
+    # Each {verse}/{chorus}/... placeholder tells us which kind of section
+    # it is and how many lines it has, so the wordless version follows the
+    # exact same song shape as Full/All Lyrics (and the genre's own JSON).
+    # ------------------------------------------------------------------ #
+    WORDLESS_FALLBACK_STRUCTURES = [
+        "[Intro]\n{intro}\n\n[Verse 1]\n{verse}\n{verse}\n\n[Chorus]\n{chorus}\n{chorus}\n\n[Verse 2]\n{verse}\n{verse}\n\n[Chorus]\n{chorus}\n{chorus}\n\n[Bridge]\n{bridge}\n\n[Chorus]\n{chorus}\n{chorus}\n\n[Outro]\n{outro}",
+        "[Intro]\n{intro}\n\n[Verse]\n{verse}\n{verse}\n\n[Pre-Chorus]\n{pre_chorus}\n\n[Chorus]\n{chorus}\n{chorus}\n\n[Bridge]\n{bridge}\n\n[Chorus]\n{chorus}\n\n[Outro]\n{outro}",
+        "[Intro]\n{intro}\n\n[Pre-Chorus]\n{pre_chorus}\n\n[Chorus]\n{chorus}\n{chorus}\n\n[Verse]\n{verse}\n{verse}\n\n[Chorus]\n{chorus}\n{chorus}\n\n[Outro]\n{outro}",
+        "[Intro]\n{intro}\n\n[Verse]\n{verse}\n{verse}\n\n[Interlude]\n{interlude}\n\n[Chorus]\n{chorus}\n{chorus}\n\n[Outro]\n{outro}",
+        "[Intro]\n{intro}\n\n[Verse]\n{verse}\n{verse}\n\n[Chorus]\n{chorus}\n\n[Bridge]\n{bridge}\n\n[Chorus]\n{chorus}\n{chorus}",
+    ]
+
+    # Only used when no wildcard JSON can be found (headers of the JSON files
+    # are already in the right language, so they are kept as-is otherwise).
+    WORDLESS_FALLBACK_HEADERS = {
+        "zh": {"Intro": "前奏", "Verse": "主歌", "Pre-Chorus": "導歌", "Chorus": "副歌",
+               "Bridge": "橋段", "Interlude": "間奏", "Outro": "尾奏"},
+        "jp": {"Intro": "イントロ", "Verse": "バース", "Pre-Chorus": "プレコーラス", "Chorus": "コーラス",
+               "Bridge": "ブリッジ", "Interlude": "インタールード", "Outro": "アウトロ"},
+    }
+
+    # Keys match the placeholder names used in the JSON ({intro}, {pre_chorus}, ...).
+    INSTRUMENTAL_DESC = {
+        "intro": ["(Atmospheric buildup, introducing the {inst})", "(Sparse opening, a lone {inst} sets the tone)",
+                  "(Slow fade-in, {inst} over soft textures)"],
+        "verse": ["(Steady rhythm, melodic {inst} playing softly)", "(Groove settles in, {inst} carrying the melody)",
+                  "(Rhythmic variation, deeper groove, {inst2} supporting)"],
+        "pre_chorus": ["(Building tension, {inst2} joins in)", "(Rising energy, {inst} and {inst2} layering up)",
+                       "(Drums tighten, {inst} climbing toward the hook)"],
+        "chorus": ["(Full band instrumental, energetic and wide)", "(Full band instrumental, driving force)",
+                   "(Main theme on {inst}, everything open and wide)"],
+        "bridge": ["(Breakdown, quiet and emotional textures, stripping back the beat)",
+                   "(Stripped back, {inst} alone over soft pads)", "(Tension drops, harmonic shift, {inst2} takes over)"],
+        "drop": ["(Massive drop, full-force {inst} and heavy rhythm)", "(Hard hit, every layer slams in at once)",
+                 "(Bass-heavy drop, {inst} cutting through)"],
+        "solo": ["(Passionate {inst} solo!)", "(Expressive {inst} improvisation, rhythm section holding steady)",
+                 "(Blazing {inst} solo over the full band)"],
+        "interlude": ["(Short instrumental break, {inst2} carries a light motif)", "(Ambient pause, textures drifting)",
+                      "(Rhythm relaxes, {inst} softly reprising the theme)"],
+        "outro": ["(Gradual fade out, lingering {inst} notes)", "(Final resolving chord, {inst} decaying to silence)",
+                  "(Rhythm dissolves, only {inst2} remains)"],
+    }
+
+    WORDLESS_DATA = {
+        "en": {
+            "syl": ["Ahhh", "Ohhh", "Oooh", "Mmm", "Laaa", "Ooh-ah", "Aaah-ooh"],
+            "hum": ["mmm...", "hmm...", "mmm-mmm..."],
+            "vline": "{a}... {b}...",
+            "desc": {
+                "intro": ["(Ethereal vocalizing...)", "(Distant breathy {syl}, barely audible)",
+                          "(Soft solo voice rising out of silence: {syl})", "(Slow wordless chant, {hum})"],
+                "verse": ["(Soft rhythmic humming: {hum})", "(Gentle layered {syl}, intimate and warm)",
+                          "(Deep resonant humming, slowly building)", "(Low murmured {syl} over sparse rhythm)"],
+                "pre_chorus": ["(Rising voices, {syl} swelling)", "(Layers stacking up, tension building: {syl})",
+                               "(Whispered {hum} turning into open {syl})"],
+                "chorus": ["(Powerful Choir singing {syl}, wordless)", "(Epic Choir singing {syl}, maximum emotion)",
+                           "(Wide stacked harmonies on {syl} and {syl2})", "(Soaring unison Choir: {syl})"],
+                "bridge": ["(Solo haunting voice vocalizing smoothly)", "(Stripped back, single voice on {syl})",
+                           "(Quiet harmonies floating, {hum})"],
+                "drop": ["(Massive Choir hit, {syl} and {syl2} slamming in together!)", "(Sudden wall of voices, {syl} at full power)"],
+                "solo": ["(Solo voice soaring wordlessly on {syl})", "(Expressive improvised vocalise, {syl} and {syl2})"],
+                "interlude": ["(Soft floating harmonies, {hum})", "(Quiet breathy {syl}, space between phrases)"],
+                "outro": ["(Fading breathy vocals... {hum})", "(Last lingering {syl}, dissolving into silence)",
+                          "(Voices thinning out to a single {hum})"],
+            },
+        },
+        "zh": {
+            "syl": ["啊", "喔", "噢", "啦", "嗚", "啊喔"],
+            "hum": ["嗯...", "哼...", "嗯嗯..."],
+            "vline": "{a}～ {b}～",
+            "desc": {
+                "intro": ["(空靈的無字吟唱...)", "(遠處傳來若有似無的氣音 {syl})",
+                          "(寂靜中升起單一聲線：{syl})", "(緩慢的無詞吟誦，{hum})"],
+                "verse": ["(輕柔的節奏哼唱：{hum})", "(溫暖親密的疊加 {syl})",
+                          "(低沉的共鳴哼唱，情緒逐漸堆疊)", "(稀疏節奏上低聲的 {syl})"],
+                "pre_chorus": ["(人聲層層上升，{syl} 逐漸擴張)", "(和聲堆疊，張力累積：{syl})",
+                               "(低語的 {hum} 轉為開闊的 {syl})"],
+                "chorus": ["(氣勢磅礴的合唱 {syl}，無歌詞)", "(史詩級合唱 {syl}，情感釋放)",
+                           "(寬廣的多層和聲 {syl} 與 {syl2})", "(高亢齊唱：{syl})"],
+                "bridge": ["(單一聲線的幽美吟唱，穿透力強)", "(退到只剩一個聲音唱 {syl})",
+                           "(安靜的和聲飄浮，{hum})"],
+                "drop": ["(全體合唱驟然爆發，{syl} 與 {syl2} 同時撞入！)", "(人聲瞬間形成聲牆，{syl} 全力釋放)"],
+                "solo": ["(單一人聲以 {syl} 無詞高歌)", "(富表現力的即興吟唱，{syl} 與 {syl2})"],
+                "interlude": ["(輕柔飄浮的和聲，{hum})", "(安靜的氣音 {syl}，樂句之間留白)"],
+                "outro": ["(氣音漸弱... {hum})", "(最後一聲悠長的 {syl}，消散於靜默)",
+                          "(人聲逐漸減少，剩下單一的 {hum})"],
+            },
+        },
+        "jp": {
+            "syl": ["アー", "オー", "ウー", "ラー", "アーオー", "ルー"],
+            "hum": ["んー...", "ふーん...", "んーんー..."],
+            "vline": "{a}～ {b}～",
+            "desc": {
+                "intro": ["(幻想的なスキャット...)", "(遠くで響く息づかいの {syl})",
+                          "(静寂から立ち上がる単独の声：{syl})", "(ゆったりした歌詞なしの詠唱、{hum})"],
+                "verse": ["(優しいハミング：{hum})", "(温かく重なる {syl}、親密に)",
+                          "(深みのあるハミング、徐々に盛り上がる)", "(まばらなリズムに低い {syl})"],
+                "pre_chorus": ["(声が重なり上昇、{syl} が膨らむ)", "(ハーモニーが積み上がり緊張感が増す：{syl})",
+                               "(ささやく {hum} が開放的な {syl} へ)"],
+                "chorus": ["(力強い合唱 {syl}、歌詞なし)", "(壮大な合唱 {syl}、感情の爆発)",
+                           "(広がる重層ハーモニー {syl} と {syl2})", "(高らかなユニゾン合唱：{syl})"],
+                "bridge": ["(透き通るようなソロのボーカライズ)", "(削ぎ落とされた単独の声で {syl})",
+                           "(静かなハーモニーが漂う、{hum})"],
+                "drop": ["(大合唱が一斉に炸裂、{syl} と {syl2} が同時に！)", "(声の壁が一気に押し寄せる、{syl} 全力で)"],
+                "solo": ["(単独の声が {syl} で歌詞なしに高く舞い上がる)", "(表情豊かな即興ヴォーカライズ、{syl} と {syl2})"],
+                "interlude": ["(柔らかく漂うハーモニー、{hum})", "(静かな息づかいの {syl}、フレーズの間に余白)"],
+                "outro": ["(息づかいのフェードアウト... {hum})", "(最後に残る {syl}、静寂へ溶ける)",
+                          "(声が減っていき、最後は {hum} だけ)"],
+            },
+        },
+    }
+
+    @staticmethod
+    def _read_json_tolerant(path):
+        """Read a wildcard JSON; auto-repair the common 'missing comma between two
+        structure strings' mistake instead of failing the whole file."""
+        with open(path, "r", encoding="utf-8-sig") as handle:
+            text = handle.read()
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            repaired = re.sub(r'"(\s*\r?\n\s*)"(?=\[)', r'",\1"', text)
+            data = json.loads(repaired)  # still broken -> raises to the caller
+            print(f"[ACE-Step Generator] Warning: auto-repaired missing comma(s) in {path}. Please fix the file.")
+            return data
+
+    def _pick_structure(self, language, selected_genre, rng):
+        # "Full Lyrics" resolution = genre-specific JSON first, then all.json
+        path = self._resolve_wildcard_path(language, "Full Lyrics", selected_genre)
+        if path:
+            try:
+                data = self._read_json_tolerant(path)
+                structures = data.get("structures") if isinstance(data, dict) else None
+                if isinstance(structures, list) and structures:
+                    return rng.choice(structures)
+            except (OSError, ValueError, TypeError) as exc:
+                print(f"[ACE-Step Generator] Warning: cannot read structures from {path} ({exc!r}); using built-in structures.")
+
+        structure = rng.choice(self.WORDLESS_FALLBACK_STRUCTURES)
+        headers = self.WORDLESS_FALLBACK_HEADERS.get(language)
+        if headers:
+            structure = re.sub(
+                r"\[([A-Za-z\-]+)( \d+)?\]",
+                lambda m: f"[{headers.get(m.group(1), m.group(1))}{m.group(2) or ''}]",
+                structure,
+            )
+        return structure
+
+    def _build_wordless_lyrics(self, vocal_mode, language, selected_genre, insts, rng):
+        choir = vocal_mode == "Choir/Humming"
+        data = self.WORDLESS_DATA.get(language) or self.WORDLESS_DATA["en"]
+        source = data["desc"] if choir else self.INSTRUMENTAL_DESC
+        main_inst = insts[0].split()[-1].capitalize() if insts else "Instrument"
+        second_inst = insts[1].split()[-1].capitalize() if len(insts) > 1 else "Rhythm section"
+
+        structure = self._pick_structure(language, selected_genre, rng)
+        pools = {}
+        blocks = []
+        for section in structure.split("\n\n"):
+            lines = section.split("\n")
+            header = lines[0] if lines and lines[0].startswith("[") else None
+            body = "\n".join(lines[1:] if header else lines)
+            tags = re.findall(r"\{([^}]+)\}", body)
+            if not tags:
+                blocks.append(section)  # literal text in the structure: keep untouched
+                continue
+
+            kind = tags[0] if tags[0] in source else "verse"
+            pool = pools.setdefault(kind, [])
+            if not pool:
+                pool.extend(source[kind])
+                rng.shuffle(pool)
+            syl, syl2 = rng.sample(data["syl"], 2)
+            text = pool.pop().format(
+                syl=syl, syl2=syl2, hum=rng.choice(data["hum"]), inst=main_inst, inst2=second_inst,
+            )
+
+            out_lines = [text]
+            if choir:
+                # one extra vocalise line per additional placeholder line (keeps section length)
+                for _ in range(min(len(tags) - 1, 3)):
+                    a, b = rng.sample(data["syl"], 2)
+                    out_lines.append(data["vline"].format(a=a, b=b))
+            blocks.append("\n".join(([header] if header else []) + out_lines))
+        return "\n\n".join(blocks)
 
     def _load_lyrics_from_mode(self, language, vocal_mode, rng, selected_genre):
         json_path = self._resolve_wildcard_path(language, vocal_mode, selected_genre)
         if json_path is None:
-            print(f"[ACE-Step Generator] Warning: No wildcard JSON found for language={language}, mode={vocal_mode}. Falling back to default lyrics.")
+            print(f"[ACE-Step Generator] Warning: No wildcard JSON found for language={language}, mode={vocal_mode}, genre={selected_genre}. Falling back to default lyrics.")
             return self._fallback_lyrics(rng)
 
         try:
-            with open(json_path, "r", encoding="utf-8") as handle:
-                wildcards_data = json.load(handle)
+            # utf-8-sig 可同時吃 BOM 與無 BOM 的 UTF-8
+            wildcards_data = self._read_json_tolerant(json_path)
+            self._dbg(f"Loaded wildcard JSON OK: {json_path}")
             return self._build_lyrics_from_json(json_path, wildcards_data, rng)
         except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
-            print(f"[ACE-Step Generator] Warning: Unable to read wildcard JSON {json_path} ({exc}). Falling back to default lyrics.")
+            print(f"[ACE-Step Generator] Warning: Unable to read wildcard JSON {json_path} ({exc!r}). Falling back to default lyrics.")
             return self._fallback_lyrics(rng)
 
+    # ------------------------------------------------------------------ #
+    # Main entry
+    # ------------------------------------------------------------------ #
     def generate_ace_params(self, seed, genre, mood, vocal_mode, language, prompt_style, vocal_timbre, extra_prompt=""):
         rng = random.Random(seed) if seed > 0 else random.Random()
 
@@ -461,6 +702,12 @@ class AceStep15PromptGenerator:
         language = language if language != "Random" else rng.choice(["en", "zh", "jp"])
         if vocal_mode == "Random":
             vocal_mode = rng.choice(["Full Lyrics", "All Lyrics", "Instrumental", "Choir/Humming"])
+
+        self._dbg(
+            f"generate_ace_params: seed={seed}, genre={selected_genre}, mood={selected_mood}, "
+            f"vocal_mode={vocal_mode}, language={language}, prompt_style={prompt_style}, "
+            f"vocal_timbre={vocal_timbre}"
+        )
 
         actual_vocal_string = ""
         if vocal_mode == "Instrumental":
@@ -510,59 +757,15 @@ class AceStep15PromptGenerator:
         final_lyrics = ""
         json_genre_name = self._genre_json_name(selected_genre)
 
-        if vocal_mode == "Instrumental":
-            main_inst = insts[0].split()[-1].capitalize() if insts else "Instrument"
-            second_inst = insts[1].split()[-1].capitalize() if len(insts) > 1 else "Rhythm section"
-            final_lyrics = (
-                f"[Intro]\n(Atmospheric buildup, introducing the {main_inst})\n\n"
-                f"[Verse 1]\n(Steady rhythm, melodic {main_inst} playing softly)\n\n"
-                f"[Pre-Chorus]\n(Building tension, {second_inst} joins in)\n\n"
-                f"[Chorus]\n(Full band instrumental, energetic and wide)\n\n"
-                f"[Verse 2]\n(Rhythmic variation, deeper groove)\n\n"
-                f"[Chorus]\n(Full band instrumental, driving force)\n\n"
-                f"[Bridge]\n(Breakdown, quiet and emotional textures, stripping back the beat)\n\n"
-                f"[Instrumental Solo]\n(Passionate {main_inst} solo!)\n\n"
-                f"[Final Chorus]\n(Epic climax, all instruments playing at maximum energy)\n\n"
-                f"[Outro]\n(Gradual fade out, lingering {main_inst} notes)"
-            )
-
-        elif vocal_mode == "Choir/Humming":
-            if language == "en":
-                final_lyrics = (
-                    "[Intro]\n(Ethereal vocalizing...)\n\n"
-                    "[Verse 1]\n(Soft rhythmic humming: mmm...)\n\n"
-                    "[Chorus]\n(Powerful Choir singing Ahhh, wordless)\n\n"
-                    "[Verse 2]\n(Deep resonant humming, slowly building)\n\n"
-                    "[Chorus]\n(Epic Choir singing Ohhh, maximum emotion)\n\n"
-                    "[Bridge]\n(Solo haunting voice vocalizing smoothly)\n\n"
-                    "[Final Chorus]\n(Massive Choir chanting Ahhh and Ohhh together!)\n\n"
-                    "[Outro]\n(Fading breathy vocals... mmm...)"
-                )
-            elif language == "zh":
-                final_lyrics = (
-                    "[前奏]\n(空靈的無字吟唱...)\n\n"
-                    "[主歌 1]\n(輕柔的節奏哼唱：嗯...)\n\n"
-                    "[副歌]\n(氣勢磅礴的合唱 啊，無歌詞)\n\n"
-                    "[主歌 2]\n(低沉的共鳴哼唱，情緒逐漸堆疊)\n\n"
-                    "[副歌]\n(史詩級合唱 喔，情感釋放)\n\n"
-                    "[橋段]\n(單一聲線的幽美吟唱，穿透力強)\n\n"
-                    "[最後副歌]\n(全體大合唱 啊與喔，推向最高潮！)\n\n"
-                    "[尾奏]\n(氣音漸弱... 嗯...)"
-                )
-            elif language == "jp":
-                final_lyrics = (
-                    "[イントロ]\n(幻想的なスキャット...)\n\n"
-                    "[バース 1]\n(優しいハミング：んー...)\n\n"
-                    "[コーラス]\n(力強い合唱 アー、歌詞なし)\n\n"
-                    "[バース 2]\n(深みのあるハミング、徐々に盛り上がる)\n\n"
-                    "[コーラス]\n(壮大な合唱 オー、感情の爆発)\n\n"
-                    "[ブリッジ]\n(透き通るようなソロのボーカライズ)\n\n"
-                    "[ラストコーラス]\n(大合唱でアーとオー、最高潮！)\n\n"
-                    "[アウトロ]\n(息づかいのフェードアウト... んー...)"
-                )
+        if vocal_mode in ("Instrumental", "Choir/Humming"):
+            final_lyrics = self._build_wordless_lyrics(vocal_mode, language, selected_genre, insts, rng)
 
         elif vocal_mode in ("Full Lyrics", "All Lyrics"):
             final_lyrics = self._load_lyrics_from_mode(language, vocal_mode, rng, selected_genre)
+            self._dbg(
+                f"lyrics length = {len(final_lyrics) if final_lyrics else 0}, "
+                f"first 80 chars = {final_lyrics[:80]!r}"
+            )
 
         return (final_prompt, final_lyrics, bpm, keyscale, language, json_genre_name, selected_mood.split("_")[0])
 

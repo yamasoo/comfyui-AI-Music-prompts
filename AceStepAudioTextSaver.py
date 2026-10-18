@@ -5,6 +5,7 @@ from fractions import Fraction
 
 import av
 import folder_paths
+import numpy as np
 
 
 class AceStepAudioTextSaver:
@@ -24,10 +25,11 @@ class AceStepAudioTextSaver:
                 "keyscale": ("STRING", {"forceInput": True}),
                 "prompt": ("STRING", {"forceInput": True}),
                 "lyrics": ("STRING", {"forceInput": True}),
-                "output_format": (["mp3", "flac"], {"default": "mp3"}),
+                "output_format": (["mp3", "flac", "mp4"], {"default": "mp3"}),
             },
             "optional": {
                 "sub_folder": ("STRING", {"default": "AceStep_Output"}),
+                "image": ("IMAGE",),
             },
         }
 
@@ -37,6 +39,7 @@ class AceStepAudioTextSaver:
     OUTPUT_NODE = True
     CATEGORY = "AceStep/Audio"
 
+    # ------------------------------------------------------------------ helpers
     @staticmethod
     def _safe_component(value, fallback="unknown"):
         """Make metadata suitable for use in a filename."""
@@ -83,13 +86,7 @@ class AceStepAudioTextSaver:
 
     @staticmethod
     def _source_path(audio):
-        """Return a source file path when an upstream node provides one.
-
-        Most ComfyUI AUDIO values contain only decoded samples, so re-encoding is
-        unavoidable in that case. Nodes that retain the original file can provide
-        ``path`` or ``filename`` plus ``subfolder`` and will be copied losslessly
-        when the requested format is the same.
-        """
+        """Return a source file path when an upstream node provides one."""
         if not isinstance(audio, dict):
             return None
         path = audio.get("path")
@@ -105,11 +102,80 @@ class AceStepAudioTextSaver:
                 return candidate
         return None
 
+    @staticmethod
+    def _prepare_video_image(image):
+        """Convert a ComfyUI IMAGE tensor into an even-sized RGB uint8 numpy array."""
+        if image is None:
+            return None
+        img = image
+        if img.dim() == 4:
+            img = img[0]
+        if img.dim() != 3 or img.shape[-1] < 3:
+            raise ValueError(f"Expected RGB image with shape [H, W, C], got {tuple(img.shape)}")
+
+        arr = (img.detach().cpu().float().clamp(0, 1).numpy() * 255.0).round().astype(np.uint8)
+        arr = np.ascontiguousarray(arr[..., :3])
+
+        # H.264 with yuv420p requires even width and height.
+        if arr.shape[0] % 2:
+            arr = arr[:-1]
+        if arr.shape[1] % 2:
+            arr = arr[:, :-1]
+        if arr.shape[0] < 2 or arr.shape[1] < 2:
+            raise ValueError("image is too small for MP4 encoding")
+        return arr
+
+    @staticmethod
+    def _encode_mp4(output_path, waveform, sample_rate, image_np, fps=1):
+        """Encode a static-image + audio MP4 suitable for YouTube uploads."""
+        total_samples = waveform.shape[1]
+        duration = total_samples / float(sample_rate)
+        n_frames = max(1, int(round(duration * fps)))
+
+        layout = "stereo" if waveform.shape[0] == 2 else "mono"
+        h, w = image_np.shape[:2]
+
+        with av.open(output_path, mode="w", format="mp4") as container:
+            # -- Audio stream (AAC) --
+            astream = container.add_stream("aac", rate=sample_rate)
+            astream.layout = layout
+            astream.bit_rate = 192000
+            astream.time_base = Fraction(1, sample_rate)
+
+            # -- Video stream (H.264 / yuv420p) --
+            vstream = container.add_stream("libx264", rate=fps)
+            vstream.width = w
+            vstream.height = h
+            vstream.pix_fmt = "yuv420p"
+            vstream.time_base = Fraction(1, fps)
+            vstream.options = {"preset": "medium", "crf": "20"}
+
+            # Encode the audio first.
+            aframe = av.AudioFrame.from_ndarray(waveform.numpy(), format="fltp", layout=layout)
+            aframe.sample_rate = sample_rate
+            aframe.time_base = Fraction(1, sample_rate)
+            aframe.pts = 0
+            for packet in astream.encode(aframe):
+                container.mux(packet)
+            for packet in astream.encode():
+                container.mux(packet)
+
+            # Then repeat the still image for the full duration.
+            for i in range(n_frames):
+                frame = av.VideoFrame.from_ndarray(image_np, format="rgb24").reformat(format="yuv420p")
+                frame.pts = i
+                frame.time_base = Fraction(1, fps)
+                for packet in vstream.encode(frame):
+                    container.mux(packet)
+            for packet in vstream.encode():
+                container.mux(packet)
+
+    # ------------------------------------------------------------------- main
     def save_all(self, audio, genre, mood, language, bpm, keyscale, prompt, lyrics,
-                 output_format="mp3", sub_folder="AceStep_Output"):
+                 output_format="mp3", sub_folder="AceStep_Output", image=None):
         output_format = str(output_format or "mp3").lower().lstrip(".")
-        if output_format not in ("mp3", "flac"):
-            raise ValueError("output_format must be mp3 or flac")
+        if output_format not in ("mp3", "flac", "mp4"):
+            raise ValueError("output_format must be mp3, flac, or mp4")
 
         safe_subfolder = self._safe_subfolder(sub_folder)
         full_output_path = os.path.join(self.output_dir, safe_subfolder)
@@ -133,7 +199,30 @@ class AceStepAudioTextSaver:
         # extension matches the requested output format.
         source_path = self._source_path(audio)
         source_format = os.path.splitext(source_path)[1].lower().lstrip(".") if source_path else None
-        if source_path and source_format == output_format:
+
+        if output_format == "mp4":
+            if image is None:
+                # No image: only possible if the upstream already provided an MP4.
+                if source_path and source_format == "mp4":
+                    shutil.copyfile(source_path, full_audio_path)
+                else:
+                    raise ValueError(
+                        "MP4 output requires an 'image' input "
+                        "(an upstream MP4 source can be copied as-is instead)"
+                    )
+            else:
+                waveform = self._normalise_waveform(audio["waveform"])
+                sample_rate = int(audio["sample_rate"])
+                if sample_rate <= 0:
+                    raise ValueError(f"Invalid sample rate: {sample_rate}")
+                image_np = self._prepare_video_image(image)
+                try:
+                    self._encode_mp4(full_audio_path, waveform, sample_rate, image_np)
+                except Exception:
+                    if os.path.exists(full_audio_path):
+                        os.remove(full_audio_path)
+                    raise
+        elif source_path and source_format == output_format:
             shutil.copyfile(source_path, full_audio_path)
         else:
             waveform = self._normalise_waveform(audio["waveform"])
