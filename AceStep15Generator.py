@@ -3,6 +3,11 @@ import os
 import random
 import re
 
+try:
+    from .prompt_data import GENRE_DATA, MOOD_DATA
+except ImportError:  # imported outside the package (tests, scripts)
+    from prompt_data import GENRE_DATA, MOOD_DATA
+
 
 class AnyType(str):
     def __new__(cls, value=""):
@@ -25,230 +30,15 @@ class AceStep15PromptGenerator:
         "jp": "lyrics_wildcards_jp",
     }
 
-    # 除錯開關：不想看 console 時改成 False
-    DEBUG_WILDCARD = True
+    # 除錯開關：需要追查 wildcard 路徑時改成 True
+    DEBUG_WILDCARD = False
 
-    GENRE_DATA = {
-        "Pop_流行": {
-            "bpm": (90, 128),
-            "instruments": [
-                "shiny synthesizers",
-                "a catchy bass groove",
-                "crisp electronic beats",
-                "acoustic guitar strums",
-                "lush vocal harmonies",
-                "a bright piano melody",
-            ],
-            "vibes": ["polished and commercial", "modern and sleek", "sunny and catchy"],
-            "dynamics": [
-                "flows smoothly with a strong hook",
-                "builds to an emotional chorus",
-                "keeps a steady danceable groove",
-            ],
-        },
-        "Rock_搖滾樂": {
-            "bpm": (110, 150),
-            "instruments": [
-                "distorted electric guitars",
-                "punchy live drums",
-                "a strong bassline",
-                "power chords",
-                "crash cymbals",
-            ],
-            "vibes": ["raw and rebellious", "gritty and authentic", "stadium-filling"],
-            "dynamics": [
-                "builds dynamically from tension to explosion",
-                "maintains a driving, relentless rhythm",
-                "features explosive choruses and quick verses",
-            ],
-        },
-        "EDM_電子舞曲": {
-            "bpm": (120, 130),
-            "instruments": [
-                "massive supersaw synths",
-                "a four-on-the-floor kick drum",
-                "sidechained basslines",
-                "bright arpeggios",
-                "risers and impacts",
-            ],
-            "vibes": ["festival-ready and huge", "energetic and euphoric", "pumping and relentless"],
-            "dynamics": [
-                "builds up tension to a massive drop",
-                "drives forward with unstoppable energy",
-                "explodes into a wall of synthetic sound",
-            ],
-        },
-        "Lo-Fi_低保真音樂": {
-            "bpm": (70, 90),
-            "instruments": [
-                "dusty vinyl crackles",
-                "a slightly detuned electric piano",
-                "a sluggish, muffled drum beat",
-                "warm upright bass",
-                "subtle nature soundscapes",
-            ],
-            "vibes": ["nostalgic and cozy", "relaxed and study-focused", "warm and analog"],
-            "dynamics": [
-                "loops gracefully without ever peaking",
-                "creates a comforting background texture",
-                "drifts lazily through jazzy chords",
-            ],
-        },
-        "Ambient_氛圍音樂": {
-            "bpm": (40, 70),
-            "instruments": [
-                "swirling granular pads",
-                "deep drone textures",
-                "ethereal reverb sweeps",
-                "minimalist synth bells",
-            ],
-            "vibes": ["spacious and meditative", "formless and atmospheric", "ethereal and tranquil"],
-            "dynamics": [
-                "drifts slowly without a clear melody",
-                "evolves through subtle timbral shifts",
-                "creates a vast sonic landscape",
-            ],
-        },
-        "Drum_Bass_鼓打貝斯": {
-            "bpm": (170, 178),
-            "instruments": [
-                "fast, complex breakbeats",
-                "a roaring Reese bass",
-                "atmospheric pads",
-                "pitch-shifted vocal samples",
-                "rapid-fire percussion",
-            ],
-            "vibes": ["fast-paced and kinetic", "liquid and smooth", "heavy and aggressive"],
-            "dynamics": [
-                "rushes forward with breakneck speed",
-                "drops into a chaotic bass assault",
-                "balances serene atmospheres with frantic drums",
-            ],
-        },
-        "Jazz_爵士樂": {
-            "bpm": (80, 120),
-            "instruments": [
-                "a breathy tenor saxophone",
-                "a walking upright bass",
-                "brushed snare drums",
-                "improvisational grand piano",
-                "a clean hollow-body guitar",
-            ],
-            "vibes": ["sophisticated and smooth", "smoky and late-night", "swinging and lively"],
-            "dynamics": [
-                "ebbs and flows with conversational solos",
-                "swings effortlessly with the rhythm section",
-                "breathes naturally through dynamic interplay",
-            ],
-        },
-        "Cinematic_電影配樂": {
-            "bpm": (60, 100),
-            "instruments": [
-                "sweeping string sections",
-                "booming orchestral percussion",
-                "a lonely solo piano",
-                "deep brass swells",
-                "a subtle choir",
-            ],
-            "vibes": ["epic and larger-than-life", "intimate and breathtaking", "vast and atmospheric"],
-            "dynamics": [
-                "slowly swells into a grand crescendo",
-                "ebbs and flows like a tide",
-                "creates a building sense of awe",
-            ],
-        },
-        "Cinematic_Orchestral_管弦樂電影配樂": {
-            "bpm": (70, 140),
-            "instruments": [
-                "soaring violins",
-                "powerful brass sections",
-                "thunderous cinematic percussion",
-                "tremolo strings",
-                "staccato cellos",
-            ],
-            "vibes": ["epic and grand", "heroic", "intense and dramatic"],
-            "dynamics": [
-                "builds into a massive orchestral swell",
-                "features dramatic pauses and explosive crescendos",
-                "commands attention with majestic scale",
-            ],
-        },
-        "Metal_金屬樂": {
-            "bpm": (140, 200),
-            "instruments": [
-                "down-tuned, heavily distorted guitars",
-                "rapid double-kick drums",
-                "a clanking bass guitar",
-                "aggressive blast beats",
-                "screaming pitch harmonics",
-            ],
-            "vibes": ["brutal and aggressive", "dark and intense", "heavy and unforgiving"],
-            "dynamics": [
-                "crushes with a wall of heavy distortion",
-                "switches from blistering speed to a heavy breakdown",
-                "pummels the listener with unrelenting force",
-            ],
-        },
-        "J-Pop_日式流行": {
-            "bpm": (110, 145),
-            "instruments": [
-                "bright digital synthesizers",
-                "a driving electric bass",
-                "crisp electronic drum patterns",
-                "an acoustic piano",
-                "layered pop vocals",
-            ],
-            "vibes": ["upbeat and modern", "melodic and energetic", "radio-friendly and sleek"],
-            "dynamics": [
-                "opens with a catchy synth riff",
-                "builds into an anthem-like chorus",
-                "features a dynamic breakdown before the final hook",
-            ],
-        },
-    }
+    # 同一組 (language, mode, genre) 的「找不到 wildcard」警告只印一次
+    _warned_missing = set()
 
-    MOOD_DATA = {
-        "Happy_快樂": {
-            "scale": "Major",
-            "adjs": ["uplifting", "joyful", "bright", "positive", "feel-good", "cheerful"],
-            "balances": ["joy and sunshine", "energy and smiles", "positivity and light"],
-        },
-        "Sad_悲傷": {
-            "scale": "Minor",
-            "adjs": ["melancholic", "heartbreaking", "sorrowful", "tear-jerking", "emotional"],
-            "balances": ["sorrow and reflection", "pain and beauty", "loss and longing"],
-        },
-        "Energetic_活力": {
-            "scale": "Major",
-            "adjs": ["powerful", "high-energy", "driving", "adrenaline-fueled", "intense"],
-            "balances": ["aggression and excitement", "power and rhythm", "motion and force"],
-        },
-        "Relaxed_放鬆": {
-            "scale": "Major",
-            "adjs": ["soothing", "laid-back", "chill", "calm", "mellow"],
-            "balances": ["calm and warmth", "peace and tranquility", "ease and comfort"],
-        },
-        "Dark_黑暗": {
-            "scale": "Minor",
-            "adjs": ["ominous", "scary", "mysterious", "shadowy", "creepy"],
-            "balances": ["tension and fear", "mystery and gloom", "suspense and dread"],
-        },
-        "Romantic_浪漫": {
-            "scale": "Minor",
-            "adjs": ["intimate", "passionate", "sentimental", "tender", "warm"],
-            "balances": ["love and desire", "sweetness and longing", "affection and warmth"],
-        },
-        "Epic_史詩": {
-            "scale": "Minor",
-            "adjs": ["grand", "heroic", "legendary", "vast", "triumphant"],
-            "balances": ["glory and scale", "power and majesty", "myth and might"],
-        },
-        "Dreamy_夢幻": {
-            "scale": "Major",
-            "adjs": ["surreal", "soft", "floating", "ethereal", "hypnotic"],
-            "balances": ["fantasy and reality", "clouds and stardust", "sleep and imagination"],
-        },
-    }
+    # Genre / mood catalogue lives in prompt_data.py (single source of truth).
+    GENRE_DATA = GENRE_DATA
+    MOOD_DATA = MOOD_DATA
 
     ROOT_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
@@ -672,7 +462,10 @@ class AceStep15PromptGenerator:
     def _load_lyrics_from_mode(self, language, vocal_mode, rng, selected_genre):
         json_path = self._resolve_wildcard_path(language, vocal_mode, selected_genre)
         if json_path is None:
-            print(f"[ACE-Step Generator] Warning: No wildcard JSON found for language={language}, mode={vocal_mode}, genre={selected_genre}. Falling back to default lyrics.")
+            key = (language, vocal_mode, selected_genre)
+            if key not in self._warned_missing:
+                self._warned_missing.add(key)
+                print(f"[ACE-Step Generator] Warning: No wildcard JSON found for language={language}, mode={vocal_mode}, genre={selected_genre}. Falling back to default lyrics.")
             return self._fallback_lyrics(rng)
 
         try:
@@ -770,10 +563,11 @@ class AceStep15PromptGenerator:
         return (final_prompt, final_lyrics, bpm, keyscale, language, json_genre_name, selected_mood.split("_")[0])
 
 
+
 NODE_CLASS_MAPPINGS = {
     "AceStep15PromptGenerator": AceStep15PromptGenerator,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "AceStep15PromptGenerator": "🎹 ACE-Step 1.5 Auto-Producer (Multi-language)",
+    "AceStep15PromptGenerator": "🎵 ACE-Step 1.5 Prompt Generator",
 }

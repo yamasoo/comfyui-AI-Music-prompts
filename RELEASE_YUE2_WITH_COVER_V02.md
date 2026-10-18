@@ -3,7 +3,7 @@
 ## 版本資訊
 
 - 版本：V02
-- 工作流程：`yue2-with-cover_V02.json`
+- 工作流程：`example_workflows/yue2-with-cover_V02.json`
 - 類型：ComfyUI workflow
 - 主題：YuE2 音樂生成與 Anima-Base-1.0 封面生成
 - 預設音訊格式：FLAC
@@ -102,10 +102,10 @@ anima-base-v1.0.safetensors
 
 ## 安裝需求
 
-本專案的音訊保存節點需要 PyAV：
+本專案的音訊保存節點需要 PyAV（必要）與 mutagen（嵌入封面用，選用）：
 
 ```bash
-pip install av
+pip install -r requirements.txt
 ```
 
 此外，使用者必須自行安裝 YuE2、Anima-Base、DeepSeek 節點及其他列出的 custom nodes。DeepSeek 節點通常也需要有效的 API 設定。
@@ -121,7 +121,7 @@ ComfyUI/output/yue2/
 
 ## 注意事項
 
-- `yue2-with-cover_V02.json` 的封面輸出是 FLAC + PNG，不是 MP4 影片。
+- `example_workflows/yue2-with-cover_V02.json` 的封面輸出是 FLAC + PNG，不是 MP4 影片。
 - 若缺少 DeepSeek API 或 custom node，封面 Prompt 生成階段將無法執行。
 - 若缺少 YuE2 或 Anima-Base 模型，對應的音樂或封面生成階段會失敗。
 - workflow 中的 seed 可固定以重現結果，也可設定為 randomize 以產生不同作品。
@@ -130,4 +130,4 @@ ComfyUI/output/yue2/
 ## 下載
 
 - Repository：https://github.com/yamasoo/comfyui-AI-Music-prompts
-- Workflow：`yue2-with-cover_V02.json`
+- Workflow：`example_workflows/yue2-with-cover_V02.json`

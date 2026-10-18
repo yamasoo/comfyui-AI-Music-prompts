@@ -1,0 +1,4 @@
+# ComfyUI already ships torch, numpy and Pillow; only extras are listed here.
+av
+# Optional: embeds cover art into mp3/flac. Without it the cover is still saved as .png.
+mutagen
