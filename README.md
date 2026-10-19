@@ -60,6 +60,7 @@
 | sub_folder | ComfyUI output 底下的子資料夾（選填，預設 `AceStep_Output`） |
 | image | 封面圖（選填） |
 | embed_cover | 是否把封面嵌入 MP3/FLAC（選填，預設開啟） |
+| fade_out_seconds | 存檔前讓最後 N 秒淡出到無聲（選填，預設 0 = 關閉）。YuE2 被 `max_duration` 截斷時可避免戛然而止；本來就安靜收尾的歌幾乎不受影響 |
 
 輸出：`audio`（原樣傳出，可接續其他節點）
 

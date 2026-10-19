@@ -1,4 +1,5 @@
 import io
+import math
 import os
 import re
 import shutil
@@ -7,6 +8,7 @@ from fractions import Fraction
 import av
 import folder_paths
 import numpy as np
+import torch
 from PIL import Image
 
 SUPPORTED_FORMATS = ("mp3", "flac", "mp4")
@@ -42,6 +44,11 @@ class AceStepAudioTextSaver:
                                                "video frame for mp4 (mp4 requires it)."}),
                 "embed_cover": ("BOOLEAN", {"default": True,
                                             "tooltip": "Embed the cover into mp3/flac files (needs mutagen)."}),
+                "fade_out_seconds": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 30.0, "step": 0.5,
+                                               "tooltip": "Fade the last N seconds to silence before saving "
+                                                          "(0 = off). Gives tracks cut off by YuE2's "
+                                                          "max_duration a clean ending; tracks that already "
+                                                          "end quietly are barely affected."}),
             },
         }
 
@@ -98,6 +105,26 @@ class AceStepAudioTextSaver:
         if waveform.shape[0] not in (1, 2):
             raise ValueError(f"Expected mono or stereo audio, got shape {tuple(waveform.shape)}")
         return waveform.detach().cpu().float().contiguous()
+
+    @staticmethod
+    def _apply_fade_out(audio, seconds):
+        """Return a copy of ``audio`` whose last ``seconds`` fade to silence (cosine curve)."""
+        sample_rate = int(audio["sample_rate"])
+        waveform = audio["waveform"]
+        length = waveform.shape[-1]
+        n = min(length, int(round(seconds * sample_rate)))
+        if n <= 1:
+            return audio
+        t = torch.linspace(0.0, 1.0, n, dtype=torch.float32, device=waveform.device)
+        curve = (0.5 * (1.0 + torch.cos(math.pi * t))).to(waveform.dtype)
+        faded = waveform.clone()
+        faded[..., length - n:] *= curve
+        result = dict(audio)
+        result["waveform"] = faded
+        # The faded audio no longer matches any source file on disk.
+        for key in ("path", "filename", "subfolder"):
+            result.pop(key, None)
+        return result
 
     @staticmethod
     def _source_path(audio):
@@ -239,13 +266,17 @@ class AceStepAudioTextSaver:
     # ------------------------------------------------------------------ main
 
     def save_all(self, audio, genre, mood, language, bpm, keyscale, prompt, lyrics,
-                 output_format="mp3", sub_folder="AceStep_Output", image=None, embed_cover=True):
+                 output_format="mp3", sub_folder="AceStep_Output", image=None, embed_cover=True,
+                 fade_out_seconds=0.0):
         output_format = str(output_format or "mp3").lower().lstrip(".")
         if output_format not in SUPPORTED_FORMATS:
             raise ValueError("output_format must be mp3, flac, or mp4")
 
         if not isinstance(audio, dict) or "waveform" not in audio or "sample_rate" not in audio:
             raise ValueError("audio must contain waveform and sample_rate")
+
+        if fade_out_seconds and fade_out_seconds > 0:
+            audio = self._apply_fade_out(audio, float(fade_out_seconds))
 
         safe_subfolder = self._safe_subfolder(sub_folder)
         full_output_path = os.path.join(self.output_dir, safe_subfolder)

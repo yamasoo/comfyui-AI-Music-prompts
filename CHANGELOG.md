@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.0] - 2026-10-19
+
+### Added
+- Saver: optional `fade_out_seconds` (default 0 = off). Fades the last N seconds to silence before saving, so tracks cut off by YuE2's `max_duration` end cleanly instead of stopping abruptly. The faded audio is also returned by the node.
+
 ## [1.2.0] - 2026-10-18
 
 ### Added
